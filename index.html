@@ -701,6 +701,7 @@ const CRD = {
   edited:"⚠️ Piste déjà éditée : le silence monté fausse la mesure du fond, lis ce chiffre avec prudence.",
   snrDo:"Coupe ce qui ronronne : clim, frigo, ventilateur d'ordi. Éloigne-toi du PC et ferme les fenêtres.",  sibOk:"Aigus tenus",sibWarn:"Les S ressortent",sibBad:"Les S ressortent beaucoup",
   sibT:l=>l?"Écoute ces moments : "+l+". ":"Aucun pic marqué. ",
+  sibRef:v=>"Seuil ajusté pour une voix de "+v.toLowerCase()+".",
   sibDo:"Si tu les entends vraiment, décale le micro de 15° par rapport à ta bouche. Mesure la moins fiable des cinq : fie-toi à ton oreille avant tout.",
   dNear:"Trop près du micro",dFar:"Trop loin du micro",dOk:"Bonne distance",
   dNearT:"L'effet de proximité gonfle les graves et rend la voix sourde.",
@@ -735,6 +736,7 @@ const CRD = {
   edited:"⚠️ Already edited track: the stripped silence skews the floor measurement, read this figure with caution.",
   snrDo:"Kill whatever hums: air conditioning, fridge, computer fan. Move away from the PC and close the windows.",  sibOk:"Highs in check",sibWarn:"The S sounds stand out",sibBad:"The S sounds stand out a lot",
   sibT:l=>l?"Listen to these moments: "+l+". ":"No marked peak. ",
+  sibRef:v=>"Threshold adjusted for a "+v.toLowerCase()+" voice.",
   sibDo:"If you really hear them, angle the mic 15° off your mouth. This is the least reliable of the five readings: trust your ears first.",
   dNear:"Too close to the mic",dFar:"Too far from the mic",dOk:"Good distance",
   dNearT:"Proximity effect is bloating the lows and dulling the voice.",
@@ -1412,7 +1414,10 @@ function show(r,ci){
   st=r.sibRatio<sibOk?"ok":(r.sibRatio<sibBad?"warn":"bad");
   cards+=card(U("capS"),fmt(r.sibRatio,1),st,st==="ok"?C("sibOk"):(st==="warn"?C("sibWarn"):C("sibBad")),
     C("sibT")(r.sibCount?r.sibilants.slice(0,8).map(p=>ts(p.t)).join(" · ")
-      +(r.sibilants.length>8?C("more")(r.sibilants.length-8):""):"")+t(T.n));
+      +(r.sibilants.length>8?C("more")(r.sibilants.length-8):""):"")
+    /* la tessiture n'est mentionnée que si elle a été renseignée : sinon on affichait
+       l'intitulé brut de l'option vide (« — je ne sais pas — ») en fin de carte. */
+    +(ci.tess?C("sibRef")(t(T.n)):""));
   S.push([U("capS"),st,st==="ok"?C("sibOk"):(st==="warn"?C("sibWarn"):C("sibBad"))]);
   if(st!=="ok") todo.push(C("sibDo"));
 
