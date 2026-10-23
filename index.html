@@ -1,0 +1,1765 @@
+<!DOCTYPE html>
+<html lang="fr">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ON THE PRISE — analyseur de prise vocale | LXO ON THE MIX</title>
+<meta name="description" content="Dépose ta prise vocale : niveau, bruit de fond, sibilance et placement micro analysés en quelques secondes. Gratuit, rien ne quitte ton ordinateur.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="ON THE PRISE — analyseur de prise vocale">
+<meta property="og:description" content="Dépose ta prise vocale. Tu sais en quelques secondes ce qui cloche et quoi corriger. Gratuit, 100 % local.">
+<meta property="og:image" content="apercu.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23EFE9DF'/%3E%3Cg fill='%23B08A42'%3E%3Crect x='7' y='13' width='3' height='6' rx='1.5'/%3E%3Crect x='12.5' y='9' width='3' height='14' rx='1.5'/%3E%3Crect x='18' y='6' width='3' height='20' rx='1.5'/%3E%3Crect x='23.5' y='12' width='3' height='8' rx='1.5'/%3E%3C/g%3E%3C/svg%3E">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+
+:root{
+  --brass1:#8C6A2F; --brass2:#D9B978; --brass3:#B08A42; --brass4:#5E4519;
+  --stone1:#EFE9DF; --stone2:#DCD3C4; --amber:#E8A33D;
+  --ok:#2E7D52; --warn:#A8731F; --bad:#A8392A; --sib:#226F87;
+  --ease:cubic-bezier(.22,.8,.3,1);
+}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:16px;padding:26px 14px;
+  background:#15130F;background-image:radial-gradient(1100px 620px at 50% -8%,#241F17,#15130F 72%);
+  font-family:Inter,system-ui,sans-serif}
+
+/* ---------- fenêtre plugin : dimensions réelles ---------- */
+.scene{perspective:2400px;width:1100px;height:620px;flex:0 0 auto}
+.flipper{position:relative;width:100%;height:100%;transform-style:preserve-3d;
+  transition:transform .8s cubic-bezier(.3,.9,.3,1)}
+.flipper.flipped{transform:rotateY(180deg)}
+.unit{position:absolute;inset:0;border-radius:11px;padding:6px;
+  backface-visibility:hidden;-webkit-backface-visibility:hidden;
+  background:linear-gradient(165deg,var(--brass2) 0%,var(--brass3) 18%,var(--brass1) 48%,
+             var(--brass4) 72%,var(--brass3) 92%,var(--brass2) 100%);
+  box-shadow:0 34px 68px -26px rgba(0,0,0,.92),0 2px 0 rgba(255,232,190,.45) inset,
+             0 -2px 0 rgba(0,0,0,.45) inset}
+.unit.back{transform:rotateY(180deg)}
+.plate{width:100%;height:100%;border-radius:7px;overflow:hidden;padding:14px 16px;
+  position:relative;display:flex;flex-direction:column;
+  background:linear-gradient(158deg,var(--stone1),var(--stone2) 55%,#CFC5B4);
+  box-shadow:0 0 0 1px rgba(90,70,35,.45),0 10px 24px -14px rgba(0,0,0,.6) inset}
+.veins{position:absolute;inset:0;opacity:.40;mix-blend-mode:multiply;pointer-events:none}
+.sheen{position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(118deg,rgba(255,255,255,.5) 0%,transparent 32%,
+             transparent 70%,rgba(255,255,255,.2) 100%)}
+.screw{position:absolute;width:12px;height:12px;border-radius:50%;z-index:4;
+  background:radial-gradient(circle at 34% 30%,#F0DCAF,#A07F3A 52%,#5B441A 100%);
+  box-shadow:0 1px 2px rgba(0,0,0,.6),0 0 0 1px rgba(60,45,18,.6)}
+.screw::after{content:"";position:absolute;inset:0;margin:auto;width:7px;height:1.4px;
+  background:rgba(50,38,15,.85);border-radius:1px;transform:rotate(var(--a,28deg))}
+.screw.tl{top:9px;left:9px}.screw.tr{top:9px;right:9px;--a:-16deg}
+.screw.bl{bottom:9px;left:9px;--a:52deg}.screw.br{bottom:9px;right:9px;--a:8deg}
+
+/* ---------- en-tête 54 px ---------- */
+.hd{height:54px;flex:0 0 54px;display:flex;align-items:center;justify-content:space-between;
+  gap:14px;position:relative;z-index:2;border-bottom:2px solid transparent;
+  border-image:linear-gradient(90deg,transparent,var(--brass1),var(--brass2),var(--brass1),transparent) 1}
+.brand{display:flex;align-items:center;gap:11px}
+.mark rect{transform-origin:center bottom;animation:vu 1.9s var(--ease) infinite}
+.mark rect:nth-child(2){animation-delay:.22s}.mark rect:nth-child(3){animation-delay:.44s}
+.mark rect:nth-child(4){animation-delay:.12s}
+@keyframes vu{0%,100%{transform:scaleY(.45)}50%{transform:scaleY(1)}}
+.ttl{font-family:"Cormorant Garamond",Georgia,serif;font-size:25px;font-weight:700;
+  line-height:1;color:#4A3E29;text-shadow:0 1px 0 rgba(255,255,255,.85)}
+.ttl em{font-style:normal;color:#8A6A2C}
+.sg{font-size:7.5px;letter-spacing:2.4px;font-weight:700;color:#8A7B5F;margin-top:4px}
+.hdr{display:flex;align-items:center;gap:9px}
+.lang{display:flex;border-radius:999px;overflow:hidden;border:2px solid var(--brass3);
+  box-shadow:0 1px 0 rgba(255,240,205,.45)}
+.lang button{border:none;padding:4px 9px;font:inherit;font-size:8.5px;letter-spacing:1.3px;
+  font-weight:700;cursor:pointer;background:linear-gradient(180deg,#241B0C,#120D06);color:#9A8A66}
+.lang button.on{background:linear-gradient(170deg,#D9B978,#B08A42);color:#3F3115}
+.ibtn{width:24px;height:24px;border-radius:50%;border:2px solid var(--brass3);cursor:pointer;
+  font-family:"Space Grotesk",sans-serif;font-size:13px;font-weight:700;color:#F2E4C4;
+  background:linear-gradient(180deg,#241B0C,#120D06);display:flex;align-items:center;
+  justify-content:center;padding:0;text-shadow:0 0 6px rgba(232,163,61,.6)}
+.plq{font-size:8.5px;letter-spacing:1.4px;font-weight:700;color:#F2E4C4;padding:6px 11px;
+  border-radius:4px;text-decoration:none;cursor:pointer;
+  background:linear-gradient(170deg,var(--brass3),var(--brass4));
+  box-shadow:0 1px 0 rgba(255,232,190,.5) inset,0 2px 5px rgba(0,0,0,.35)}
+
+/* ---------- barre de pages 40 px ---------- */
+.pages{height:40px;flex:0 0 40px;display:flex;gap:6px;align-items:center;margin-top:8px;
+  position:relative;z-index:2}
+.pg{flex:1;height:30px;border-radius:6px;cursor:pointer;border:1px solid rgba(120,98,55,.35);
+  background:linear-gradient(180deg,rgba(255,255,255,.45),rgba(190,176,152,.3));
+  font-size:9px;letter-spacing:1.5px;font-weight:700;color:#6E6250;
+  display:flex;align-items:center;justify-content:center;transition:all .18s var(--ease);
+  text-shadow:0 1px 0 rgba(255,255,255,.8)}
+.pg:hover{border-color:var(--brass3);color:#3F3115}
+.pg.on{background:linear-gradient(170deg,var(--brass2),var(--brass3));color:#3F3115;
+  border-color:var(--brass1);box-shadow:0 2px 7px -2px rgba(140,106,47,.8);text-shadow:none}
+.pg.cfg{flex:0 0 112px;background:linear-gradient(180deg,#241B0C,#120D06);color:#E4D2A6;
+  border-color:var(--brass4);text-shadow:none}
+.pg.cfg:hover{color:#FFF6E2;border-color:var(--brass2)}
+
+/* ---------- zone de contenu 440 px ---------- */
+.content{flex:1 1 auto;min-height:0;position:relative;z-index:2;margin-top:8px;overflow:hidden}
+.page{position:absolute;inset:0;display:none;flex-direction:column;gap:9px}
+.page.on{display:flex;animation:fade .3s var(--ease)}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+.inset{border-radius:7px;position:relative;overflow:hidden;
+  background:linear-gradient(180deg,#1D1A14,#13110D);
+  box-shadow:0 3px 9px rgba(0,0,0,.6) inset,0 0 0 2px rgba(90,70,35,.55),
+             0 1px 0 rgba(255,240,205,.35)}
+.scope{flex:0 0 170px;padding:8px}
+.scope canvas{display:block;width:100%;height:100%}
+.glass{position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(176deg,rgba(255,255,255,.13),transparent 42%)}
+
+.leds{flex:0 0 44px;display:flex;align-items:center;justify-content:space-evenly;gap:22px;padding:0 14px;border-radius:6px;
+  background:linear-gradient(180deg,rgba(255,255,255,.4),rgba(190,176,152,.3));
+  box-shadow:0 1px 0 rgba(255,255,255,.7) inset,0 0 0 1px rgba(120,98,55,.25)}
+.led{display:flex;align-items:center;gap:8px;font-size:8.5px;letter-spacing:1.6px;
+  font-weight:700;color:#6E6250;text-shadow:0 1px 0 rgba(255,255,255,.8)}
+.bulb{width:11px;height:11px;border-radius:50%;
+  background:radial-gradient(circle at 36% 32%,#6B6358,#2B2721 70%);
+  box-shadow:0 0 0 2px rgba(90,70,35,.5),0 1px 2px rgba(0,0,0,.5) inset}
+.bulb.on{background:radial-gradient(circle at 36% 32%,#FFF0CE,var(--c) 58%,#7A3A12 100%);
+  box-shadow:0 0 0 2px rgba(90,70,35,.5),0 0 11px 2px var(--c),0 0 22px 4px var(--c)}
+
+.reads{flex:0 0 96px;display:grid;grid-template-columns:repeat(5,1fr);gap:9px}
+.read{border-radius:6px;padding:8px 9px 6px;text-align:center;
+  background:linear-gradient(170deg,var(--brass2),var(--brass3) 45%,var(--brass1));
+  box-shadow:0 1px 0 rgba(255,240,205,.6) inset,0 -1px 0 rgba(60,45,18,.5) inset}
+.read .win{border-radius:3px;padding:5px 3px 4px;margin-bottom:5px;
+  background:linear-gradient(180deg,#16140F,#0C0B08);
+  box-shadow:0 2px 6px rgba(0,0,0,.7) inset,0 1px 0 rgba(255,240,205,.3)}
+.read .num{font-variant-numeric:tabular-nums;font-weight:700;font-size:19px;letter-spacing:-.5px;
+  color:var(--amber);line-height:1.1;text-shadow:0 0 8px rgba(232,163,61,.7)}
+.read .u{font-size:7px;color:rgba(232,163,61,.6);letter-spacing:1.2px;font-weight:600}
+.read .cap{font-size:7.5px;letter-spacing:1.4px;font-weight:700;color:#3F3115;
+  text-shadow:0 1px 0 rgba(255,240,205,.55)}
+
+.fixes{flex:1 1 auto;min-height:0;border-radius:6px;padding:10px 13px;overflow:hidden;
+  background:rgba(255,253,250,.62);box-shadow:0 0 0 1px rgba(120,98,55,.25),
+  inset 3px 0 0 var(--brass3)}
+.fixes h5{margin:0 0 6px;font-size:8.5px;letter-spacing:1.6px;color:#8A6A2C;font-weight:700}
+.fixes ol{margin:0;padding-left:16px}
+.fixes li{font-size:11.5px;color:#4B4436;line-height:1.5;margin-bottom:3px}
+.fixes b{color:#2F2B20}
+
+/* cartes de verdict */
+.cards{flex:0 0 164px;display:grid;grid-template-columns:repeat(4,1fr);gap:9px}
+.card{border-radius:7px;padding:10px 11px;background:rgba(255,253,250,.72);
+  box-shadow:0 0 0 1px rgba(120,98,55,.22);border-left:3px solid #BBB}
+.card.ok{border-left-color:var(--ok)}.card.warn{border-left-color:var(--warn)}
+.card.bad{border-left-color:var(--bad)}
+.card .l{font-size:7.5px;letter-spacing:1.3px;text-transform:uppercase;color:#8A7B5F;font-weight:700}
+.card .v{font-family:"Space Grotesk",sans-serif;font-size:20px;font-weight:700;
+  letter-spacing:-.6px;margin:3px 0 1px;color:#2F2B20;font-variant-numeric:tabular-nums}
+.card .d{font-size:10px;font-weight:700;margin-bottom:3px}
+.card.ok .d{color:var(--ok)}.card.warn .d{color:var(--warn)}.card.bad .d{color:var(--bad)}
+.card .t{font-size:9.5px;color:#6E6250;line-height:1.4}
+
+/* colonnes : préparation et conseils */
+.cols{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:1fr 1fr;
+  gap:7px 11px;align-content:start;overflow:hidden}
+.stp{border-radius:6px;padding:8px 10px;display:flex;gap:9px;align-items:flex-start;
+  background:rgba(255,253,250,.66);box-shadow:0 0 0 1px rgba(120,98,55,.2)}
+.stp.warn{box-shadow:0 0 0 1px rgba(120,98,55,.2),inset 3px 0 0 var(--bad)}
+.stp .n{flex:0 0 19px;height:19px;border-radius:50%;font-size:10px;font-weight:800;
+  background:linear-gradient(135deg,var(--brass2),var(--brass3));color:#3F3115;
+  display:flex;align-items:center;justify-content:center;font-family:"Space Grotesk",sans-serif}
+.stp.warn .n{background:linear-gradient(135deg,#D96A57,var(--bad));color:#fff}
+.stp h6{margin:0 0 2px;font-size:11px;font-family:"Space Grotesk",sans-serif;color:#2F2B20}
+.stp p{margin:0;font-size:9.5px;color:#6E6250;line-height:1.42}
+.stp b{color:#3A3426}
+
+/* ---------- pied 26 px ---------- */
+.ft{height:26px;flex:0 0 26px;display:flex;align-items:center;justify-content:space-between;
+  font-size:8px;letter-spacing:1.2px;font-weight:600;color:#7E7158;position:relative;z-index:2;
+  border-top:1px solid rgba(120,98,55,.3);margin-top:6px;text-shadow:0 1px 0 rgba(255,255,255,.7)}
+
+/* ---------- dos ---------- */
+.bp{width:100%;height:100%;border-radius:7px;overflow:hidden;padding:18px 20px;position:relative;
+  display:flex;flex-direction:column;
+  background:linear-gradient(172deg,#7E6029,#5E4519 42%,#4A370F 78%,#6B5120);
+  box-shadow:0 0 0 1px rgba(40,30,12,.7),0 10px 24px -14px rgba(0,0,0,.8) inset}
+.brush{position:absolute;inset:0;opacity:.3;pointer-events:none;
+  background:repeating-linear-gradient(94deg,rgba(255,236,196,.26) 0 1px,transparent 1px 3px)}
+.bh{display:flex;justify-content:space-between;align-items:center;padding-bottom:11px;
+  margin-bottom:16px;border-bottom:1px solid rgba(255,236,196,.22);position:relative;z-index:2}
+.bt{font-size:10px;letter-spacing:2.6px;font-weight:700;color:#F2E4C4}
+.bg4{display:grid;grid-template-columns:repeat(4,1fr);gap:13px;position:relative;z-index:2}
+.bg4 label{display:block;font-size:7.5px;letter-spacing:1.6px;font-weight:700;color:#E4D2A6;
+  margin-bottom:4px}
+.bg4 select{width:100%;font:inherit;font-size:11.5px;padding:7px 8px;border-radius:4px;
+  color:#F6EBD2;border:1px solid rgba(40,30,12,.8);cursor:pointer;
+  background:linear-gradient(180deg,#201809,#140F06);
+  box-shadow:0 2px 6px rgba(0,0,0,.6) inset,0 1px 0 rgba(255,236,196,.26)}
+.bg4 select option{background:#F7F2E7;color:#231F12}
+.sn{font-size:7.5px;letter-spacing:1.8px;color:rgba(242,228,196,.5);margin-top:auto;
+  padding-top:12px;border-top:1px solid rgba(255,236,196,.16);position:relative;z-index:2;
+  display:flex;justify-content:space-between;align-items:center}
+.ctrl{background:linear-gradient(170deg,var(--brass2),var(--brass1));border:none;border-radius:4px;
+  padding:7px 13px;font:inherit;font-size:8.5px;letter-spacing:1.4px;font-weight:700;
+  color:#3F3115;cursor:pointer;box-shadow:0 1px 0 rgba(255,240,205,.6) inset}
+
+.caption{color:#8A8371;font-size:12px;text-align:center;max-width:1100px;line-height:1.6}
+/* En dessous de 1180 px le chassis est mis a l'echelle : il garde ses proportions
+   reelles de plugin. En dessous de 760 px il devient illisible, on sert autre chose. */
+.scene{transform-origin:top center}
+.gate{display:none;max-width:460px;color:#C7BFAE;text-align:center;line-height:1.65;font-size:15px}
+.gate h1{font-family:'Cormorant Garamond',Georgia,serif;font-size:34px;letter-spacing:.5px;
+  color:#EFE9DF;margin:0 0 6px}
+.gate h1 em{font-style:italic;color:#D9B978}
+.gate .sub{font-size:11px;letter-spacing:2.6px;color:#8A8371;margin-bottom:22px}
+.gate p{margin:0 0 16px}
+.gate .box{background:rgba(255,255,255,.045);border:1px solid rgba(217,185,120,.25);
+  border-radius:10px;padding:16px 18px;margin:20px 0}
+.gate .lnk{display:inline-block;margin-top:4px;padding:11px 20px;border-radius:8px;
+  background:linear-gradient(165deg,#D9B978,#B08A42 60%,#8C6A2F);color:#1B1710;
+  font-weight:700;text-decoration:none;font-size:14px;border:0;cursor:pointer}
+.gate .ins{color:#C8A96A;text-decoration:none;border-bottom:1px solid rgba(200,169,106,.4)}
+@media (max-width:759px){
+  .scene,.caption{display:none}
+  .gate{display:block}
+}
+.caption b{color:#C8A96A}
+
+/* --- ajouts version officielle --- */
+.scope.drop{cursor:pointer}
+.scope.drop.hot{box-shadow:0 3px 9px rgba(0,0,0,.6) inset,0 0 0 2px var(--brass2),0 0 22px rgba(200,137,42,.5)}
+.dropmsg{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:5px;color:#C8A96A;pointer-events:none;text-align:center}
+.dropmsg b{font-family:"Space Grotesk",sans-serif;font-size:15px;color:#E8CFA0}
+.dropmsg span{font-size:10px;letter-spacing:1.2px;opacity:.75}
+.eq{display:inline-flex;gap:3px;align-items:flex-end;height:13px}
+.eq i{width:3px;background:var(--amber);border-radius:2px;animation:eq .9s ease-in-out infinite}
+.eq i:nth-child(2){animation-delay:.15s}.eq i:nth-child(3){animation-delay:.3s}
+@keyframes eq{0%,100%{height:3px}50%{height:13px}}
+.ovl{position:fixed;inset:0;z-index:90;display:none;align-items:center;justify-content:center;
+  padding:22px;background:rgba(14,12,9,.66);backdrop-filter:blur(5px)}
+.ovl.open{display:flex}
+.modal{width:min(620px,100%);max-height:84vh;overflow:auto;border-radius:12px;padding:6px;
+  background:linear-gradient(165deg,var(--brass2),var(--brass3) 20%,var(--brass1) 52%,var(--brass4) 76%,var(--brass2));
+  box-shadow:0 30px 64px -24px rgba(0,0,0,.9)}
+.mbody{border-radius:7px;padding:22px 24px;position:relative;
+  background:linear-gradient(158deg,var(--stone1),var(--stone2) 60%,#CFC5B4)}
+.mbody h3{font-family:"Cormorant Garamond",Georgia,serif;font-size:24px;margin:0 0 2px;color:#4A3E29}
+.mbody .msub{font-size:8.5px;letter-spacing:2.4px;font-weight:700;color:#8A7B5F;margin:0 0 15px}
+.mbody h4{font-size:8.5px;letter-spacing:1.9px;font-weight:700;color:#8A6A2C;margin:17px 0 7px}
+.mbody p,.mbody li{font-size:12.5px;color:#4B4436;line-height:1.6}
+.mbody p{margin:0 0 8px}
+.mbody ul{margin:0;padding-left:0;list-style:none}
+.mbody li{padding:6px 0;border-bottom:1px solid rgba(120,98,55,.17);display:flex;gap:10px}
+.mbody li:last-child{border:none}
+.mbody li b{color:#3A3426;flex:0 0 auto;min-width:104px}
+.mbody .dot{width:10px;height:10px;border-radius:50%;flex:0 0 auto;margin-top:5px;
+  box-shadow:0 0 0 2px rgba(90,70,35,.35),0 0 8px 1px currentColor}
+.mclose{position:absolute;top:14px;right:16px;width:26px;height:26px;border-radius:50%;border:none;
+  cursor:pointer;font-size:15px;color:#3F3115;background:linear-gradient(165deg,#E6CB93,var(--brass3))}
+.mnote{margin-top:16px;padding-top:12px;border-top:1px solid rgba(120,98,55,.25);font-size:11.5px;color:#7E7158}
+[data-theme="dark"] .plate{background:linear-gradient(158deg,#23262E,#1B1E25 55%,#15181E)}
+[data-theme="dark"] .veins{opacity:.14}
+[data-theme="dark"] .ttl{color:#E8E2D4;text-shadow:0 1px 0 rgba(0,0,0,.5)}
+[data-theme="dark"] .sg,[data-theme="dark"] .ft{color:#8E8775;text-shadow:none}
+[data-theme="dark"] .pg{background:linear-gradient(180deg,#2A2E36,#22262D);color:#9AA2B1;
+  border-color:#343A44;text-shadow:none}
+[data-theme="dark"] .leds{background:linear-gradient(180deg,#2A2E36,#22262D);box-shadow:0 0 0 1px #343A44}
+[data-theme="dark"] .led{color:#9AA2B1;text-shadow:none}
+[data-theme="dark"] .fixes{background:rgba(34,38,45,.8);box-shadow:0 0 0 1px #343A44,inset 3px 0 0 var(--brass3)}
+[data-theme="dark"] .fixes li{color:#C9CED8}[data-theme="dark"] .fixes b{color:#EDF0F5}
+[data-theme="dark"] .card,[data-theme="dark"] .stp{background:rgba(34,38,45,.85);box-shadow:0 0 0 1px #343A44}
+[data-theme="dark"] .card .v,[data-theme="dark"] .stp h6{color:#EDF0F5}
+[data-theme="dark"] .card .t,[data-theme="dark"] .stp p{color:#9AA2B1}
+[data-theme="dark"] .stp b{color:#E3E7EE}
+
+/* --- retournement : seule la face visible reçoit les clics --- */
+.flipper .unit{pointer-events:auto;z-index:1}
+.flipper.flipped .unit:not(.back){pointer-events:none;z-index:0}
+.flipper:not(.flipped) .unit.back{pointer-events:none;z-index:0}
+.flipper.flipped .unit.back{pointer-events:auto;z-index:2}
+
+.ctrl.rst{background:linear-gradient(180deg,#2A2008,#1A1407);color:#C9B88E;
+  border:1px solid rgba(255,236,196,.3);box-shadow:none}
+.ctrl.rst:hover{color:#F2E4C4;border-color:var(--brass2)}
+
+/* --- thème sombre : le châssis entier, dos compris --- */
+[data-theme="dark"] body{background-image:radial-gradient(1100px 620px at 50% -8%,#1C1F26,#0C0E12 72%)}
+[data-theme="dark"] .unit{
+  background:linear-gradient(165deg,#6E6A62 0%,#4E4B45 18%,#3A3832 48%,
+             #24231F 72%,#4A4740 92%,#6E6A62 100%)}
+[data-theme="dark"] .screw{background:radial-gradient(circle at 34% 30%,#C8C4BA,#6B6861 52%,#33312C 100%)}
+[data-theme="dark"] .bp{background:linear-gradient(172deg,#33312B,#24231F 42%,#1A1916 78%,#2C2A25)}
+[data-theme="dark"] .bt,[data-theme="dark"] .bg4 label{color:#D7D2C4}
+[data-theme="dark"] .sn{color:rgba(215,210,196,.5);border-top-color:rgba(215,210,196,.16)}
+[data-theme="dark"] .brush{opacity:.14}
+[data-theme="dark"] .hd{border-image:linear-gradient(90deg,transparent,#5E5A52,#8E897C,#5E5A52,transparent) 1}
+[data-theme="dark"] .plq{background:linear-gradient(170deg,#4E4B45,#2A2824)}
+[data-theme="dark"] .pg.on{background:linear-gradient(170deg,#8E897C,#5E5A52);color:#F2F0EA}
+[data-theme="dark"] .read{background:linear-gradient(170deg,#5E5A52,#413E38 45%,#2C2A25)}
+[data-theme="dark"] .read .cap{color:#E3DFD4;text-shadow:none}
+[data-theme="dark"] .stp .n{background:linear-gradient(135deg,#8E897C,#5E5A52);color:#F2F0EA}
+[data-theme="dark"] .card .l,[data-theme="dark"] .fixes h5{color:#A9A294}
+[data-theme="dark"] .ctrl{background:linear-gradient(170deg,#8E897C,#5E5A52);color:#F2F0EA}
+[data-theme="dark"] .ctrl.rst{background:linear-gradient(180deg,#26241F,#1A1916);color:#B8B2A4}
+
+
+/* --- barre de fichier et historique --- */
+.filebar{flex:0 0 24px;display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:0 2px}
+.fname{font-size:10px;letter-spacing:.3px;color:#6E6250;font-weight:600;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap;flex:1 1 auto;
+  text-shadow:0 1px 0 rgba(255,255,255,.7)}
+.fname b{color:#3F3115;font-weight:700}
+.fname .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--brass3);
+  margin-right:6px;vertical-align:middle}
+#hist{flex:0 0 auto;max-width:210px;font:inherit;font-size:10px;font-weight:600;
+  padding:3px 7px;border-radius:4px;color:#F6EBD2;cursor:pointer;
+  border:1px solid var(--brass4);background:linear-gradient(180deg,#241B0C,#140F06);
+  box-shadow:0 1px 0 rgba(255,240,205,.3)}
+#hist:focus{outline:none;border-color:var(--brass2)}
+#hist:disabled{opacity:.4;cursor:not-allowed}
+[data-theme="dark"] .fname{color:#9AA2B1;text-shadow:none}
+[data-theme="dark"] .fname b{color:#EDF0F5}
+
+/* --- transport et tête de lecture --- */
+.transport{display:flex;align-items:center;gap:4px;flex:0 0 auto}
+.tbtn{width:22px;height:22px;border-radius:4px;border:1px solid var(--brass4);cursor:pointer;
+  background:linear-gradient(180deg,#241B0C,#140F06);color:#E8CFA0;font-size:10px;padding:0;
+  display:flex;align-items:center;justify-content:center;transition:all .15s var(--ease)}
+.tbtn:hover{color:#FFF6E2;border-color:var(--brass2)}
+.tbtn:disabled{opacity:.3;cursor:not-allowed}
+.tbtn.play{width:28px;background:linear-gradient(170deg,#D9B978,#B08A42);color:#3F3115;
+  border-color:var(--brass3);font-size:11px}
+.ttime{font-size:9px;font-variant-numeric:tabular-nums;color:#6E6250;font-weight:600;
+  min-width:68px;text-align:center;text-shadow:0 1px 0 rgba(255,255,255,.7)}
+[data-theme="dark"] .ttime{color:#9AA2B1;text-shadow:none}
+.scope.playable{cursor:crosshair}
+
+/* --- cartes en page ANALYSE --- */
+.page.on .cards{flex:1 1 auto;min-height:0}
+.cards .card{display:flex;flex-direction:column;overflow:hidden}
+.cards .card .t{overflow:hidden}
+/* --- résumé en page DÉTAIL --- */
+.sumgrid{flex:0 0 176px;display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.sumbox{border-radius:7px;padding:12px 14px;overflow:hidden;
+  background:rgba(255,253,250,.72);box-shadow:0 0 0 1px rgba(120,98,55,.22)}
+.sumbox.good{border-left:3px solid var(--ok)}
+.sumbox.bad{border-left:3px solid var(--bad)}
+.sumbox h5{margin:0 0 8px;font-size:8.5px;letter-spacing:1.6px;font-weight:700}
+.sumbox.good h5{color:var(--ok)} .sumbox.bad h5{color:var(--bad)}
+.sumbox ul{margin:0;padding:0;list-style:none}
+.sumbox li{font-size:11.5px;color:#4B4436;line-height:1.5;padding:2px 0;display:flex;gap:7px}
+.sumbox li i{font-style:normal;flex:0 0 auto;font-weight:700}
+.sumbox.good li i{color:var(--ok)} .sumbox.bad li i{color:var(--bad)}
+.sumbox li b{color:#2F2B20}
+.sumbox .none{font-size:11.5px;color:#8A7B5F;margin:0}
+[data-theme="dark"] .sumbox{background:rgba(34,38,45,.85);box-shadow:0 0 0 1px #343A44}
+[data-theme="dark"] .sumbox li{color:#C9CED8} [data-theme="dark"] .sumbox li b{color:#EDF0F5}
+[data-theme="dark"] .sumbox .none{color:#8E8775}
+
+.tbtn.imp{margin-right:6px;font-size:13px;font-weight:700;flex:0 0 auto}
+.tbtn.imp:hover{background:linear-gradient(170deg,#D9B978,#B08A42);color:#3F3115;
+  border-color:var(--brass3)}
+</style>
+
+<div class="scene"><div class="flipper" id="flip">
+
+<div class="unit">
+ <div class="plate">
+  <svg class="veins" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" viewBox="0 0 600 340">
+   <defs>
+    <filter id="mA"><feTurbulence type="fractalNoise" baseFrequency="0.013 0.05" numOctaves="5" seed="7" result="n"/>
+      <feColorMatrix in="n" type="matrix" values="0 0 0 0 .55  0 0 0 0 .48  0 0 0 0 .36  0 0 0 -1.5 1.05"/>
+      <feGaussianBlur stdDeviation=".5"/></filter>
+    <filter id="mB"><feTurbulence type="fractalNoise" baseFrequency="0.004 0.03" numOctaves="3" seed="23" result="n2"/>
+      <feColorMatrix in="n2" type="matrix" values="0 0 0 0 .42  0 0 0 0 .36  0 0 0 0 .26  0 0 0 -1.9 1.15"/></filter>
+   </defs>
+   <rect width="600" height="340" filter="url(#mA)"/><rect width="600" height="340" filter="url(#mB)" opacity=".6"/>
+  </svg>
+  <div class="sheen"></div>
+  <span class="screw tl"></span><span class="screw tr"></span>
+  <span class="screw bl"></span><span class="screw br"></span>
+
+  <div class="hd">
+   <div class="brand">
+    <svg class="mark" width="26" height="30" viewBox="0 0 34 38">
+     <rect x="0" y="10" width="6" height="18" rx="3" fill="#C8892A"/>
+     <rect x="9" y="4" width="6" height="30" rx="3" fill="#E0A444"/>
+     <rect x="18" y="12" width="6" height="14" rx="3" fill="#C8892A"/>
+     <rect x="27" y="7" width="6" height="24" rx="3" fill="#E0A444"/>
+    </svg>
+    <div><div class="ttl">ON THE <em>PRISE</em></div><div class="sg">BY LXO ON THE MIX</div></div>
+   </div>
+   <div class="hdr">
+    <span class="lang"><button id="btnFR" class="on">FR</button><button id="btnEN">EN</button></span>
+    <button class="ibtn" id="infoBtn" title="Mode d'emploi">i</button>
+    <a class="plq" href="https://www.instagram.com/lxoonthemix/" target="_blank" rel="noopener">Analyseur de prise audio</a>
+   </div>
+  </div>
+
+  <div class="pages">
+   <div class="pg on" data-p="0" id="pg0">ANALYSE</div>
+   <div class="pg" data-p="1" id="pg1">DÉTAIL</div>
+   <div class="pg" data-p="2" id="pg2">PRÉPARATION</div>
+   <div class="pg" data-p="3" id="pg3">CONSEILS</div>
+   <div class="pg cfg" id="toBack">RÉGLAGES ⟲</div>
+  </div>
+
+  <div class="content">
+   <div class="page on">
+    <div class="filebar">
+      <span class="fname" id="fname"></span>
+      <button class="tbtn imp" id="impBtn" title="Importer une autre prise">＋</button>
+      <span class="transport">
+        <button class="tbtn" id="tPrev" disabled title="Repère précédent">⏮</button>
+        <button class="tbtn play" id="tPlay" disabled title="Lecture / pause">▶</button>
+        <button class="tbtn" id="tNext" disabled title="Repère suivant">⏭</button>
+        <span class="ttime" id="tTime">0:00 / 0:00</span>
+      </span>
+      <select id="hist" disabled></select>
+    </div>
+    <div class="inset scope drop" id="drop">
+      <canvas id="wave" width="2080" height="320"></canvas>
+      <div class="dropmsg" id="dropmsg"><b>Dépose ta prise vocale ici</b><span>WAV · MP3 · AIFF · M4A — ou clique</span></div>
+      <div class="glass"></div>
+    </div>
+    <input type="file" id="file" accept="audio/*" style="display:none">
+    <div class="leds">
+     <div class="led"><span class="bulb" id="ledS" style="--c:#4FA8C4"></span><span>SIBILANCE</span></div>
+     <div class="led"><span class="bulb" id="ledC" style="--c:#E8A33D"></span><span>SATURATION</span></div>
+     <div class="led"><span class="bulb" id="ledR" style="--c:#7FBF6A"></span><span>SIGNAL</span></div>
+    </div>
+    <div class="cards" id="cards"></div>
+   </div>
+   <div class="page">
+    <div class="sumgrid">
+      <div class="sumbox good"><h5 id="sumOkT">CE QUI VA</h5><ul id="sumOk"></ul></div>
+      <div class="sumbox bad"><h5 id="sumKoT">CE QUI NE VA PAS</h5><ul id="sumKo"></ul></div>
+    </div>
+    <div class="fixes"><h5 id="fixT2">À CORRIGER, DANS L'ORDRE</h5><ol id="fixAll"></ol></div></div>
+   <div class="page"><div class="cols" id="before"></div></div>
+   <div class="page"><div class="cols" id="gear"></div></div>
+  </div>
+
+  <div class="ft"><span id="chain"></span>
+   <span style="display:flex;align-items:center;gap:10px">
+     <span id="meta">1100 × 620</span></span></div>
+ </div>
+</div>
+
+<div class="unit back">
+ <div class="bp">
+  <div class="brush"></div>
+  <div class="bh"><div class="bt" id="backTitle">CONFIGURATION</div>
+    <button class="ctrl" id="themeBtn">THÈME</button></div>
+  <div class="bg4">
+   <div><label id="fMic">MICRO</label><select id="mic"></select></div>
+   <div><label id="fIface">CARTE SON</label><select id="iface"></select></div>
+   <div><label id="fPre">PRÉAMPLI EXTERNE</label><select id="pre"></select></div>
+   <div><label id="fProc">TRAITEMENT À L'ENTRÉE</label><select id="inproc"></select></div>
+   <div><label id="fRoom">PIÈCE</label><select id="room"></select></div>
+   <div><label id="fTess">TIMBRE DE VOIX</label><select id="tess"></select></div>
+   <div><label id="fSpl">INTENSITÉ DE LA PRISE</label><select id="spl"></select></div>
+  </div>
+  <div class="sn"><span id="cfgHint">ON THE PRISE v0.1 · LXO ON THE MIX · S/N 0001</span>
+   <span style="display:flex;gap:8px"><button class="ctrl rst" id="resetBtn">RÉINITIALISER</button>
+   <button class="ctrl" id="toFront">⟲ FAÇADE</button></span></div>
+ </div>
+</div>
+
+</div></div>
+
+<div class="ovl" id="ovl"><div class="modal"><div class="mbody">
+  <button class="mclose" id="mclose">✕</button><div id="mcontent"></div>
+</div></div></div>
+
+<div class="gate">
+  <h1>ON THE <em>PRISE</em></h1>
+  <div class="sub">BY LXO ON THE MIX</div>
+  <p>Tu déposes une prise vocale, et tu sais en quelques secondes où elle pèche :
+     niveau, bruit de fond, sibilance, placement du micro. Et quoi régler pour la refaire mieux.</p>
+  <div class="box">
+    <p style="margin:0 0 10px"><b style="color:#E8A33D">Ouvre cette page sur ton ordinateur.</b></p>
+    <p style="margin:0;font-size:13.5px;color:#9A9388">L’outil travaille sur tes fichiers audio,
+       qui sont sur la machine où tourne ton DAW. Et rien n’est envoyé nulle part : tout le calcul
+       se fait dans ton navigateur.</p>
+    <button class="lnk" id="gcopy">Copier le lien</button>
+  </div>
+  <p style="font-size:13.5px">En attendant, je mixe et masterise —
+     <a class="ins" href="https://www.instagram.com/lxoonthemix/" target="_blank" rel="noopener">@lxoonthemix</a></p>
+</div>
+
+<p class="caption" id="caption"></p>
+<p class="caption" id="cta" hidden><span id="ctaQ"></span>
+  <a id="ctaA" href="https://ig.me/m/lxoonthemix" target="_blank" rel="noopener"
+     style="color:#C8A96A;text-decoration:none;border-bottom:1px solid rgba(200,169,106,.45)"></a>.</p>
+
+<script>
+const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
+
+/* ---- Adaptation a l'ecran -------------------------------------------------
+   Le chassis a des dimensions de plugin : 1100x620 fixes. Sur un ecran plus
+   etroit on le met a l'echelle plutot que de le reflow, pour qu'il garde ses
+   proportions reelles. Sous 760 px la CSS sert la page d'accueil a la place. */
+function fitScene(){
+  const sc=document.querySelector(".scene"); if(!sc) return;
+  const k=Math.min(1,(window.innerWidth-28)/1100);
+  if(k>=1){ sc.style.transform=""; sc.style.height=""; sc.style.marginBottom=""; return; }
+  sc.style.transform="scale("+k.toFixed(4)+")";
+  sc.style.height=(620*k)+"px";              /* le flux suit la taille affichee */
+  sc.style.marginBottom=(-(620-620*k))+"px";
+}
+addEventListener("resize",fitScene); fitScene();
+
+const gc=document.querySelector("#gcopy");
+if(gc) gc.onclick=async()=>{
+  try{ await navigator.clipboard.writeText(location.href); gc.textContent="Lien copié ✓"; }
+  catch(e){ window.prompt("Copie ce lien :", location.href); }
+};
+
+let LANG = "fr";
+
+
+const UI = {
+ fr:{  themeLight:"THÈME : CLAIR",themeDark:"THÈME : SOMBRE",
+  tessM:"Voix masculines",tessF:"Voix féminines",
+  sumOk:"CE QUI VA",sumKo:"CE QUI NE VA PAS",allGood:"Tout est dans les clous.",nothingGood:"Rien à signaler de positif.",
+  waitCard:"en attente",selLab:"sélection",selAll:"prise entière",selHint:"Glisse sur la forme d'onde pour analyser une partie",
+importTip:"Importer une autre prise",
+
+  hist:"HISTORIQUE",histNone:"Aucun fichier",noFileYet:"Aucun fichier chargé",
+  reset:"RÉINITIALISER",resetDone:"Plugin réinitialisé",
+  pg0:"ANALYSE",pg1:"DÉTAIL",pg2:"PRÉPARATION",pg3:"CONSEILS",pgCfg:"RÉGLAGES ⟲",
+  dropHere:"Dépose ta prise vocale ici",dropSub:"WAV · MP3 · AIFF · M4A — ou clique",
+  fixesT:"À CORRIGER, DANS L'ORDRE",fixesFull:"LE DÉTAIL DES CORRECTIONS",
+  capG:"GAIN REQUIS",noFile:"Aucun fichier analysé",lang:"LANGUE",theme:"THÈME",
+  noFixes:"Rien à corriger, ta prise est bonne.",waiting:"Dépose un fichier pour voir le verdict.",
+  sub:"Dépose une prise vocale. En quelques secondes tu sais ce qui cloche, où exactement, et quoi faire pour la refaire mieux.",
+  tabB:"AVANT LA PRISE",tabBs:"Réglages conseillés",tabA:"APRÈS LA PRISE",tabAs:"Analyse du fichier",
+  secB:"Tes réglages, étape par étape",secA:"Ta prise",secV:"Le verdict en détail",
+  dropT:"Dépose un fichier audio ici",dropS:"WAV, MP3, AIFF, M4A · ou clique pour choisir",
+  note:"Tout se passe sur ton ordinateur. Aucun fichier n'est envoyé nulle part.",
+  analysing:"Analyse en cours…",unreadable:"Fichier illisible. Essaie un WAV ou un MP3.",failed:"L\u2019analyse a \u00e9chou\u00e9.",
+  chain:"Renseigne ton matériel pour commencer",cfg:"CONFIGURATION",
+  cfgHint:"Ces réglages affinent l'analyse et les conseils",back:"COMMENCER ⟲",front:"⟲ FAÇADE",
+  theme:"Mode sombre",themeL:"Mode clair",
+  ledS:"SIBILANCE",ledC:"SATURATION",ledR:"SIGNAL",
+  ctaQ:"Tu veux que je m’occupe du mix ?",ctaA:"Écris-moi",
+  capP:"NIVEAU",capN:"SIGNAL / BRUIT",capS:"SIBILANCE",capD:"DISTANCE",
+  lgSig:"signal",lgNoise:"plancher de bruit",lgSib:"sibilance",
+  foot1:"Niveau et distance calibrés sur prises réelles. La sibilance est indicative : tes oreilles restent le juge final.",
+  fMic:"Micro",fIface:"Carte son",fPre:"Préampli externe",fProc:"Traitement à l'entrée",
+  fRoom:"Pièce",fTess:"Timbre de voix",fSpl:"Intensité de la prise",opt:"(optionnel)",
+  gearT:"Conseils liés à ton setup",gearNone:"Renseigne ton matériel au-dessus pour avoir des conseils ciblés.",
+  gCard:"Carte son",gPre:"Préampli",gProc:"Traitement à l'entrée",gMic:"Micro",gRoom:"Pièce",gTess:"Tessiture",
+  todoT:"À corriger, dans l'ordre",okT:"Ta prise est bonne",
+  okB:"Niveau, bruit de fond, sibilance et placement : tout est dans les clous. Passe à l'édition.",
+  noSig:"Rien à analyser",noSigB:"Le fichier est vide ou quasiment silencieux.",diag:"Diagnostic",
+  noSigD:"Impossible d'analyser ce fichier.",
+  sec:"s",lowband:"bande grave analysée à",trunc:"analyse limitée aux",trunc2:"premières secondes",
+  mono:"mono",stereo:"stéréo"},
+ en:{  themeLight:"THEME: LIGHT",themeDark:"THEME: DARK",
+  tessM:"Male voices",tessF:"Female voices",
+  sumOk:"WHAT WORKS",sumKo:"WHAT DOES NOT",allGood:"Everything is within range.",nothingGood:"Nothing positive to report.",
+  waitCard:"waiting",selLab:"selection",selAll:"whole take",selHint:"Drag across the waveform to analyse a portion",
+importTip:"Import another take",
+
+  hist:"HISTORY",histNone:"No file",noFileYet:"No file loaded",
+  reset:"RESET",resetDone:"Plugin reset",
+  pg0:"ANALYSIS",pg1:"DETAIL",pg2:"PREPARATION",pg3:"ADVICE",pgCfg:"SETTINGS ⟲",
+  dropHere:"Drop your vocal take here",dropSub:"WAV · MP3 · AIFF · M4A — or click",
+  fixesT:"WHAT TO FIX, IN ORDER",fixesFull:"THE FIXES IN DETAIL",
+  capG:"GAIN NEEDED",noFile:"No file analysed",lang:"LANGUAGE",theme:"THEME",
+  noFixes:"Nothing to fix, your take is good.",waiting:"Drop a file to see the verdict.",
+  sub:"Drop a vocal take. In seconds you know what is wrong, exactly where, and what to do to record it better.",
+  tabB:"BEFORE THE TAKE",tabBs:"Recommended settings",tabA:"AFTER THE TAKE",tabAs:"File analysis",
+  secB:"Your settings, step by step",secA:"Your take",secV:"The verdict in detail",
+  dropT:"Drop an audio file here",dropS:"WAV, MP3, AIFF, M4A · or click to browse",
+  note:"Everything runs on your computer. No file is sent anywhere.",
+  analysing:"Analysing…",unreadable:"Unreadable file. Try a WAV or an MP3.",failed:"Analysis failed.",
+  chain:"Enter your gear to get started",cfg:"CONFIGURATION",
+  cfgHint:"These settings refine the analysis and the advice",back:"START ⟲",front:"⟲ FRONT",
+  theme:"Dark mode",themeL:"Light mode",
+  ledS:"SIBILANCE",ledC:"CLIP",ledR:"SIGNAL",
+  ctaQ:"Want me to handle the mix?",ctaA:"Write to me",
+  capP:"LEVEL",capN:"SIGNAL / NOISE",capS:"SIBILANCE",capD:"DISTANCE",
+  lgSig:"signal",lgNoise:"noise floor",lgSib:"sibilance",
+  foot1:"Level and distance calibrated on real takes. Sibilance is indicative: your ears remain the final judge.",
+  fMic:"Microphone",fIface:"Audio interface",fPre:"External preamp",fProc:"Input processing",
+  fRoom:"Room",fTess:"Voice type",fSpl:"Take intensity",opt:"(optional)",
+  gearT:"Advice for your setup",gearNone:"Enter your gear above to get targeted advice.",
+  gCard:"Interface",gPre:"Preamp",gProc:"Input processing",gMic:"Microphone",gRoom:"Room",gTess:"Voice type",
+  todoT:"What to fix, in order",okT:"Your take is good",
+  okB:"Level, noise floor, sibilance and placement are all within range. Move on to editing.",
+  noSig:"Nothing to analyse",noSigB:"The file is empty or almost silent.",diag:"Diagnosis",
+  noSigD:"This file cannot be analysed.",
+  sec:"s",lowband:"low band analysed at",trunc:"analysis limited to the first",trunc2:"seconds",
+  mono:"mono",stereo:"stereo"}
+};
+
+const STP = {
+ fr:{room:"Choisis ton coin — pièce",
+  usbT:"Branche le micro en USB",
+  usbB:"Connecte-le directement, sans hub si possible. Pas d'alimentation fantôme à gérer, le préampli est dans le micro. <b>Désactive l'amélioration vocale et la réduction de bruit de Windows</b> dans les propriétés du périphérique.",
+  ribT:"Branche le XLR, puis réfléchis avant le 48 V",
+  ribB:"Sur un ruban passif, l'alimentation fantôme peut détruire la capsule. <b>Branche le câble en premier, fantôme éteint.</b> Ne l'active que si ton ruban est actif et le demande explicitement.",
+  dynT:"Branche le XLR",
+  dynB:"Câble d'abord, gain à zéro. Un micro dynamique n'a pas besoin d'alimentation fantôme.",
+  dynBoost:" <b>En revanche ton booster de gain la réclame</b> : une fois branché, active le 48 V.",
+  dynNo:" Elle ne l'abîme pas, mais elle ne sert à rien.",
+  conT:"Branche le XLR, puis allume le 48 V",
+  conB:"<b>Toujours dans cet ordre.</b> Câble en premier, gain à zéro, puis alimentation fantôme. Ton micro est un statique, il ne produit aucun signal sans elle. Laisse-lui deux ou trois secondes pour se stabiliser.",
+  swT:"Règle les interrupteurs du micro",
+  hpfOn:"<b>Active le coupe-bas</b> du micro : tu travailles près et ta tessiture est grave, il nettoiera le grondement sans toucher à ta voix.",
+  hpfMaybe:"Le coupe-bas est disponible. Active-le si tu entends un grondement de pièce ou de circulation.",
+  padOn:"<b>Active le pad</b> : ta prise est forte, il protège l'étage d'entrée de la saturation.",
+  splHigh:s=>`Ce micro tient ${s} dB SPL, tu es loin de la limite, mais sans pad recule plutôt que de baisser le gain.`,
+  sm7b:"Les deux interrupteurs au dos du SM7B : coupe-bas contre l'effet de proximité, présence pour désembuer la voix.",
+  popT:"Monte l'anti-pop à 8-10 cm du micro",
+  popB:"Il casse le souffle des P et des B avant qu'il frappe la membrane. ",
+  popOrigin:"Ta grille intégrée aide, mais elle ne remplace pas un anti-pop sur la voix. ",
+  popSm57:"Le SM57 n'a pas la grille du SM58 : l'anti-pop est indispensable ici. ",
+  popEnd:"Place-le entre ta bouche et le micro, <b>pas collé à la grille</b>.",
+  posT:d=>`Place-toi à ${d} du micro`,
+  posDyn:"Un micro dynamique rejette bien la pièce, tu peux travailler près. ",
+  posRoom:"Ta pièce n'est pas traitée, donc reste dans le bas de la fourchette : plus tu es près, moins la pièce rentre. ",
+  posLoud:"Sur une prise aussi forte, recule pour protéger la capsule et limiter l'effet de proximité. ",
+  posSoft:"Sur une prise murmurée, rapproche-toi : tu as besoin de signal, pas de pièce. ",
+  posEnd:"Décale le micro de <b>10 à 15°</b> par rapport à l'axe de ta bouche, les sifflantes passeront mieux.",
+  procT:"Mets le traitement en bypass",
+  procB:x=>`Tu as un ${x} dans la chaîne. <b>Ce qui est compressé ou égalisé à la prise est gravé dans le fichier.</b> Enregistre à sec, ou garde la réduction sous 3 dB si tu tiens vraiment à la couleur.`,
+  gUsbT:"Règle le gain dans le système",
+  gUsbB:"Le préampli est dans le micro : le réglage se fait dans les paramètres son de Windows ou dans l'application du fabricant, <b>pas dans ton DAW</b>.",
+  gT:n=>`Monte le gain jusqu'à ${n} dB`,
+  gB:(n,lab,loc)=>`Avec ce micro et ${lab.toLowerCase()}, il te faut environ <b>${n} dB de gain</b>, à régler ${loc}.`,
+  gMiss:(a,m)=>` ⚠️ Ta chaîne ne fournit que ${a} dB : il te manque ${m} dB. Ajoute un booster de gain avant d'enregistrer, sinon ta prise sera faible et pleine de souffle.`,
+  gTight:a=>` Ta chaîne en fournit ${a} dB : tu seras en bout de course et le souffle du préampli s'entendra. Un booster te donnerait de l'air.`,
+  gOk:(a,m)=>` Ta chaîne en fournit ${a} dB, soit ${m} dB de marge. Confortable.`,
+  gEarT:"Règle ton gain à l'oreille",
+  gEarB:"Je n'ai pas la fiche technique de ce micro. Monte le gain progressivement jusqu'à voir des crêtes autour de <b>−8 dBFS</b> sur ta phrase la plus forte.",
+  testT:"Teste, et vise une moyenne autour de −15 dBFS",
+  testB:"<b>Fais ta phrase la plus forte</b>, pas un simple « test test » : c'est elle qui décide du réglage. Vise <b>−15 dBFS de moyenne</b> ; jusqu'à −7 ça reste utilisable tant que rien n'écrête, mais tu n'as plus de marge. Si ça dépasse, redescends le gain plutôt que de reculer, tu perdrais le placement que tu viens de trouver.",
+  recT:"Avant d'appuyer sur REC",
+  recB:"Coupe la clim, le frigo et le ventilateur de l'ordi. Ferme les fenêtres. Enlève tes bagues et ton bracelet. Enregistre <b>10 secondes de silence</b> au début : tu auras ton plancher de bruit pour la suite, et un repère pour le débruitage."},
+ en:{room:"Pick your spot — room",
+  usbT:"Plug the mic in over USB",
+  usbB:"Connect it directly, avoiding hubs. No phantom power to worry about, the preamp is inside the mic. <b>Disable Windows voice enhancement and noise suppression</b> in the device properties.",
+  ribT:"Plug the XLR, then think before the 48 V",
+  ribB:"On a passive ribbon, phantom power can destroy the capsule. <b>Connect the cable first, phantom off.</b> Only switch it on if your ribbon is active and explicitly asks for it.",
+  dynT:"Plug the XLR",
+  dynB:"Cable first, gain at zero. A dynamic mic does not need phantom power.",
+  dynBoost:" <b>Your gain booster does need it</b> though: once connected, switch the 48 V on.",
+  dynNo:" It will not damage it, but it serves no purpose.",
+  conT:"Plug the XLR, then switch on the 48 V",
+  conB:"<b>Always in that order.</b> Cable first, gain at zero, then phantom power. Your mic is a condenser, it produces no signal without it. Give it two or three seconds to settle.",
+  swT:"Set the switches on the mic",
+  hpfOn:"<b>Engage the low-cut</b> on the mic: you are working close and your range is low, it will clean the rumble without touching your voice.",
+  hpfMaybe:"A low-cut is available. Engage it if you hear room rumble or traffic.",
+  padOn:"<b>Engage the pad</b>: your take is loud, it protects the input stage from clipping.",
+  splHigh:s=>`This mic handles ${s} dB SPL, so you are well under the limit, but without a pad step back rather than lowering the gain.`,
+  sm7b:"The two switches on the back of the SM7B: low-cut against proximity effect, presence to clear the voice.",
+  popT:"Set the pop filter 8-10 cm from the mic",
+  popB:"It breaks the blast of P and B sounds before it hits the diaphragm. ",
+  popOrigin:"The built-in grille helps, but it does not replace a pop filter on vocals. ",
+  popSm57:"The SM57 lacks the SM58 grille: a pop filter is essential here. ",
+  popEnd:"Place it between your mouth and the mic, <b>not against the grille</b>.",
+  posT:d=>`Stand ${d} from the mic`,
+  posDyn:"A dynamic mic rejects the room well, so you can work close. ",
+  posRoom:"Your room is untreated, so stay at the near end of the range: the closer you are, the less room gets in. ",
+  posLoud:"On a take this loud, step back to protect the capsule and limit proximity effect. ",
+  posSoft:"On a whispered take, move closer: you need signal, not room. ",
+  posEnd:"Angle the mic <b>10 to 15°</b> off the axis of your mouth, sibilance will sit better.",
+  procT:"Bypass the processing",
+  procB:x=>`You have a ${x} in the chain. <b>Whatever is compressed or equalised at the source is baked into the file.</b> Record dry, or keep the reduction under 3 dB if you really want the colour.`,
+  gUsbT:"Set the gain in the system",
+  gUsbB:"The preamp is inside the mic: the setting lives in the Windows sound panel or the maker's app, <b>not in your DAW</b>.",
+  gT:n=>`Raise the gain to ${n} dB`,
+  gB:(n,lab,loc)=>`With this mic and ${lab.toLowerCase()}, you need roughly <b>${n} dB of gain</b>, set ${loc}.`,
+  gMiss:(a,m)=>` ⚠️ Your chain only provides ${a} dB: you are ${m} dB short. Add a gain booster before recording, otherwise your take will be weak and full of hiss.`,
+  gTight:a=>` Your chain provides ${a} dB: you will be at the end of the travel and the preamp hiss will show. A booster would give you room.`,
+  gOk:(a,m)=>` Your chain provides ${a} dB, which is ${m} dB of headroom. Comfortable.`,
+  gEarT:"Set the gain by ear",
+  gEarB:"I do not have the spec sheet for this mic. Raise the gain gradually until peaks land around <b>−8 dBFS</b> on your loudest line.",
+  testT:"Test, and aim for an average around −15 dBFS",
+  testB:"<b>Perform your loudest line</b>, not a quick \"check check\": that is what sets the level. Aim for <b>−15 dBFS average</b>; up to −7 stays usable as long as nothing clips, but you have no headroom left. If it overshoots, lower the gain rather than stepping back, or you lose the placement you just found.",
+  recT:"Before you hit REC",
+  recB:"Switch off the air conditioning, the fridge and the computer fan. Close the windows. Take off rings and bracelets. Record <b>10 seconds of silence</b> at the start: you will have your noise floor for later, and a reference for denoising."}
+};
+
+const CRD = {
+ fr:{clipV:"Ça sature",clipT:c=>`${c} échantillons écrêtés. La distorsion est gravée, aucun plugin ne la retire.`,
+  clipDo:"<b>Refais la prise.</b> Baisse le gain de 6 à 10 dB, vise des crêtes autour de −8 dBFS.",
+  more:n=>` et ${n} autres`,
+  tolV:"Haut mais ça passe",tolT:"Au-dessus de la cible, et c'est toléré tant que ça n'écrête pas. Viser −15 dBFS te laisserait plus de marge pour un mot plus fort.",tolDo:"Tu peux laisser tel quel si rien n'écrête. Pour être tranquille, baisse le gain de quelques dB et vise une moyenne autour de −15 dBFS.",
+  hotV:"Trop chaud",hotT:"Ton niveau de travail dépasse −7 dBFS. Il n'y a plus de marge pour un mot plus fort : baisse le gain d'entrée et vise −15.",
+  hotDo:"Baisse le gain pour revenir autour de −15 dBFS de moyenne. Au-delà de −7, un seul mot plus fort te fait écrêter.",
+  lowV:"Trop faible",lowT:"Sous −20 dBFS il faut monter le gain, sinon tu remontes au mix et le souffle avec.",
+  lowDoDyn:"Avec ce micro il faut du gain propre : monte le préampli, ou ajoute un booster type Cloudlifter.",
+  lowDo:"Monte le gain du préampli, vise des crêtes entre −12 et −6 dBFS.",
+  okV:"Bon niveau",okT:"Ton niveau de travail est dans la bonne fenêtre. La cible idéale est autour de −15 dBFS.",
+  snrOk:"Prise propre",snrWarn:"Bruit audible",snrBad:"Fond trop présent",
+  snrT:(f,ok)=>`Plancher à ${f} dBFS. `+(ok?"Le fond est largement sous la voix.":"Ce fond remontera dès que tu compresseras."),
+  edited:"⚠️ Piste déjà éditée : le silence monté fausse la mesure du fond, lis ce chiffre avec prudence.",
+  snrDo:"Coupe ce qui ronronne : clim, frigo, ventilateur d'ordi. Éloigne-toi du PC et ferme les fenêtres.",  sibOk:"Aigus tenus",sibWarn:"Les S ressortent",sibBad:"Les S ressortent beaucoup",
+  sibT:l=>l?"Écoute ces moments : "+l+". ":"Aucun pic marqué. ",
+  sibDo:"Si tu les entends vraiment, décale le micro de 15° par rapport à ta bouche. Mesure la moins fiable des cinq : fie-toi à ton oreille avant tout.",
+  dNear:"Trop près du micro",dFar:"Trop loin du micro",dOk:"Bonne distance",
+  dNearT:"L'effet de proximité gonfle les graves et rend la voix sourde.",
+  dFarT:"Voix maigre et pièce trop présente dans la prise.",
+  dOkT:"L'équilibre grave / médium est celui d'une voix bien placée.",
+  dWin:(a,b)=>` Fenêtre attendue : ${a} à ${b} dB.`,
+  dDoNear:"Recule à 15-20 cm du micro. Tu perdras du gras, tu gagneras en intelligibilité.",
+  dDoFar:"Rapproche-toi à 15-20 cm. Tu captes trop ta pièce, et ça ne s'enlève pas au mix.",
+  gLab:"Gain nécessaire",gNeed:n=>`Il te faut ~${n} dB de gain`,
+  gNoIf:(lab,sens,src)=>`Calculé pour ${lab.toLowerCase()} avec ce micro (${sens} mV/Pa). Renseigne ta carte son pour savoir si elle suit. Source : ${src}.`,
+  gMarg:m=>`${m} dB de marge`,gTight:m=>`Seulement ${m} dB de marge`,gMiss:m=>`Il te manque ${m} dB`,
+  gBody:(n,lab,a,b)=>`Ce micro demande ~${n} dB pour ${lab.toLowerCase()}. Ta chaîne en fournit ${a} dB${b}. `,
+  gBoost:b=>` (dont ${b} dB de booster)`,
+  gMissT:"C'est la cause de ton niveau trop faible : ajoute un booster de gain type Cloudlifter.",
+  gTightT:"Tu travailles en bout de course, le souffle du préampli commence à s'entendre.",
+  gOkT:"Tu as de quoi travailler sans pousser le préampli dans ses retranchements.",
+  bothFar:"<b>Rapproche-toi avant de toucher au gain.</b> Ton niveau est faible <i>et</i> tu es loin du micro : gagner quelques centimètres te rend du signal sans ajouter de souffle, alors que monter le gain remonterait aussi le bruit de la pièce.",
+  bothNear:"<b>Recule plutôt que de baisser le gain.</b> Ton niveau est fort <i>et</i> tu es trop près : reculer corrige les deux d'un coup, et tu perds au passage l'effet de proximité qui alourdit la voix.",
+  gSrc:s=>` Sources : ${s}.`,gUnsure:" ⚠️ Chiffre à confirmer."},
+ en:{clipV:"It's clipping",clipT:c=>`${c} clipped samples. The distortion is baked in, no plugin removes it.`,
+  clipDo:"<b>Record it again.</b> Lower the gain by 6 to 10 dB, aim for peaks around −8 dBFS.",
+  more:n=>` and ${n} more`,
+  tolV:"Hot but usable",tolT:"Above target, and that is tolerated as long as nothing clips. Aiming for −15 dBFS would leave more room for a louder word.",tolDo:"You can leave it as is if nothing clips. To be safe, lower the gain a few dB and aim for an average around −15 dBFS.",
+  hotV:"Too hot",hotT:"Your working level is above −7 dBFS. There is no room left for a louder word: lower the input gain and aim for −15.",
+  hotDo:"Lower the gain back to around −15 dBFS average. Past −7, a single louder word makes it clip.",
+  lowV:"Too quiet",lowT:"Below −20 dBFS you need more gain, otherwise you push it in the mix and the hiss with it.",
+  lowDoDyn:"This mic needs clean gain: raise the preamp, or add a booster such as a Cloudlifter.",
+  lowDo:"Raise the preamp gain, aim for peaks between −12 and −6 dBFS.",
+  okV:"Good level",okT:"Your working level sits in the right window. The ideal target is around −15 dBFS.",
+  snrOk:"Clean take",snrWarn:"Audible noise",snrBad:"Noise floor too high",
+  snrT:(f,ok)=>`Floor at ${f} dBFS. `+(ok?"The background sits well below the voice.":"That floor will rise the moment you compress."),
+  edited:"⚠️ Already edited track: the stripped silence skews the floor measurement, read this figure with caution.",
+  snrDo:"Kill whatever hums: air conditioning, fridge, computer fan. Move away from the PC and close the windows.",  sibOk:"Highs in check",sibWarn:"The S sounds stand out",sibBad:"The S sounds stand out a lot",
+  sibT:l=>l?"Listen to these moments: "+l+". ":"No marked peak. ",
+  sibDo:"If you really hear them, angle the mic 15° off your mouth. This is the least reliable of the five readings: trust your ears first.",
+  dNear:"Too close to the mic",dFar:"Too far from the mic",dOk:"Good distance",
+  dNearT:"Proximity effect is bloating the lows and dulling the voice.",
+  dFarT:"Thin voice and too much room in the take.",
+  dOkT:"The low/mid balance is that of a well-placed voice.",
+  dWin:(a,b)=>` Expected window: ${a} to ${b} dB.`,
+  dDoNear:"Step back to 15-20 cm. You lose some weight, you gain intelligibility.",
+  dDoFar:"Move in to 15-20 cm. You are capturing too much room, and that cannot be removed in the mix.",
+  gLab:"Gain required",gNeed:n=>`You need ~${n} dB of gain`,
+  gNoIf:(lab,sens,src)=>`Calculated for ${lab.toLowerCase()} with this mic (${sens} mV/Pa). Enter your interface to know whether it keeps up. Source: ${src}.`,
+  gMarg:m=>`${m} dB of headroom`,gTight:m=>`Only ${m} dB of headroom`,gMiss:m=>`You are ${m} dB short`,
+  gBody:(n,lab,a,b)=>`This mic needs ~${n} dB for ${lab.toLowerCase()}. Your chain provides ${a} dB${b}. `,
+  gBoost:b=>` (including ${b} dB of booster)`,
+  gMissT:"This is why your level is too low: add a gain booster such as a Cloudlifter.",
+  gTightT:"You are at the end of the travel, and the preamp hiss starts to show.",
+  gOkT:"You have room to work without pushing the preamp to its limit.",
+  bothFar:"<b>Move closer before touching the gain.</b> Your level is low <i>and</i> you are far from the mic: gaining a few centimetres gives you signal without adding hiss, whereas raising the gain would also lift the room noise.",
+  bothNear:"<b>Step back rather than lowering the gain.</b> Your level is hot <i>and</i> you are too close: stepping back fixes both at once, and you lose the proximity effect that weighs the voice down.",
+  gSrc:s=>` Sources: ${s}.`,gUnsure:" ⚠️ Figure to confirm."}
+};
+
+const HELP = {
+ fr:{t:"Mode d'emploi",sub:"ON THE PRISE · LXO ON THE MIX",
+  intro:"Cet appareil écoute une prise vocale et te dit ce qui cloche, où exactement, et quoi faire pour la refaire mieux. Il n'écrit jamais dans ton fichier et ne modifie pas ton audio.",
+  h1:"LA MARCHE À SUIVRE",
+  steps:[["1 · Configure","Clique sur <b>RÉGLAGES ⟲</b> à droite de la barre de pages. L'appareil se retourne : renseigne ton micro, ta carte son, ton préampli, ta pièce, ton timbre et l'intensité de ta prise. Plus c'est précis, plus les seuils s'adaptent à toi."],
+   ["2 · Dépose ta prise","Reviens en façade avec <b>⟲ FAÇADE</b>, puis glisse ton fichier audio <b>directement sur la fenêtre de forme d'onde</b>, ou clique dessus pour parcourir."],
+   ["3 · Lis le verdict","Les voyants s'allument, les afficheurs se remplissent, et les corrections apparaissent par ordre de priorité sous la forme d'onde. Le nom du fichier s'affiche au-dessus, et le menu <b>HISTORIQUE</b> à droite garde les douze dernières prises de la session : tu peux revenir sur n'importe laquelle sans la recharger."],
+   ["4 · Écoute le problème","Clique sur la forme d'onde pour y sauter, ou utilise <b>⏮ ▶ ⏭</b> pour passer d'un repère au suivant. Comme le clic sert à naviguer, le petit bouton <b>＋</b> à gauche du transport sert à charger une autre prise — le glisser-déposer fonctionne toujours aussi. <b>Glisse horizontalement sur la forme d'onde</b> pour isoler une portion : toutes les mesures se recalculent sur cette seule partie, et la lecture s'y limite. Un clic hors de la sélection l'efface. Le clic s'aimante sur les repères colorés et démarre un peu avant, pour que tu entendes l'approche. La barre d'espace lance et arrête la lecture."],
+   ["5 · Prépare la suivante","La page <b>PRÉPARATION</b> te donne les réglages conseillés dans l'ordre, du branchement au niveau de crête."]],
+  h2:"LES QUATRE PAGES",
+  pages:[["ANALYSE","La forme d'onde avec les repères, les voyants, et les cinq cartes de verdict avec leur explication."],
+   ["DÉTAIL","Le bilan en deux colonnes — ce qui va, ce qui ne va pas — puis la liste des corrections par ordre de priorité."],
+   ["PRÉPARATION","Les neuf étapes de réglage avant d'enregistrer, recalculées selon ton matériel."],
+   ["CONSEILS","Les conseils liés précisément à ta carte, ton micro, ton préampli et ta pièce."]],
+  h3:"LES BOUTONS",
+  btns:[["RÉGLAGES ⟲","Retourne l'appareil pour accéder à la configuration."],
+   ["⟲ FAÇADE","Revient à l'avant."],
+   ["FR / EN","Change la langue de tout le plugin, conseils compris."],
+   ["THÈME","Au dos : bascule entre le marbre clair et le thème sombre."],
+   ["RÉINITIALISER","Au dos : remet les réglages par défaut et efface l'analyse en cours."],
+   ["i","Cette fenêtre. Échap ou un clic à côté la ferme."]],
+  h4:"LES VOYANTS",
+  leds:[["#D4553F","PLOSIVE","un souffle de P ou de B a frappé la membrane. Repéré en rouge sur la forme d'onde."],
+   ["#4FA8C4","SIBILANCE","un S ou un CH trop agressif. Repéré en cyan."],
+   ["#E8A33D","SATURATION","le signal a écrêté. Repéré en ambre sur la forme d'onde. Irrécupérable, il faut refaire la prise."],
+   ["#7FBF6A","SIGNAL","de la voix a bien été détectée dans le fichier."]],
+  h5:"LES CINQ CARTES DE VERDICT",
+  reads:[["NIVEAU","Le 90e centile des crêtes court-terme, ce que lit ton vumètre. <b>Vise −15 dBFS.</b> Jusqu'à −7 c'est toléré tant que rien n'écrête, au-delà il n'y a plus de marge."],
+   ["SIGNAL / BRUIT","L'écart entre ta voix et le fond de la pièce. Au-dessus de 40 dB, c'est propre."],
+   ["SIBILANCE","De combien les S dépassent le corps de la voix. La moins fiable des cinq : elle signale des moments à écouter."],
+   ["DISTANCE","L'équilibre entre le grave profond et le médium, calibré sur des prises à 10, 20 et 30 cm. <b>Indépendante du gain</b> : c'est un rapport entre deux bandes, donc monter le volume ne la change pas. Trop haut, tu es trop près."],
+   ["GAIN REQUIS","Le gain dont ton micro a besoin pour cette intensité, calculé depuis sa sensibilité réelle."]],
+  note:"Tout se calcule sur ton ordinateur, aucun fichier n'est envoyé nulle part. Le niveau et la distance sont calibrés sur des prises réelles au Neumann TLM 102. La sibilance est la mesure la moins fiable des cinq : elle signale des moments à écouter, pas un verdict."},
+ en:{t:"How to use it",sub:"ON THE PRISE · LXO ON THE MIX",
+  intro:"This unit listens to a vocal take and tells you what is wrong, exactly where, and what to do to record it better. It never writes to your file and never alters your audio.",
+  h1:"THE WORKFLOW",
+  steps:[["1 · Configure","Click <b>SETTINGS ⟲</b> at the right of the page bar. The unit flips over: enter your mic, interface, preamp, room, voice type and take intensity. The more precise you are, the better the thresholds fit you."],
+   ["2 · Drop your take","Flip back with <b>⟲ FRONT</b>, then drag your audio file <b>straight onto the waveform window</b>, or click it to browse."],
+   ["3 · Read the verdict","The lamps light up, the displays fill in, and the fixes appear in priority order under the waveform. The file name shows above, and the <b>HISTORY</b> menu on the right keeps the last twelve takes of the session: you can go back to any of them without reloading."],
+   ["4 · Hear the problem","Click the waveform to jump there, or use <b>⏮ ▶ ⏭</b> to step from one marker to the next. Since the click is used for navigation, the small <b>＋</b> button left of the transport loads another take — drag and drop still works too. <b>Drag horizontally across the waveform</b> to isolate a portion: every reading is recomputed on that part alone, and playback stays inside it. A click outside the selection clears it. The click snaps to the coloured markers and starts slightly before, so you hear the approach. The space bar plays and pauses."],
+   ["5 · Prepare the next one","The <b>PREPARATION</b> page gives you the recommended settings in order, from plugging in to peak level."]],
+  h2:"THE FOUR PAGES",
+  pages:[["ANALYSIS","The waveform with its markers, the lamps, and the five verdict cards with their explanation."],
+   ["DETAIL","The two-column summary — what works, what does not — then the list of fixes in priority order."],
+   ["PREPARATION","The nine setup steps before recording, recalculated from your gear."],
+   ["ADVICE","Advice tied precisely to your interface, mic, preamp and room."]],
+  h3:"THE BUTTONS",
+  btns:[["SETTINGS ⟲","Flips the unit over to reach the configuration."],
+   ["⟲ FRONT","Returns to the front."],
+   ["FR / EN","Switches the language of the whole plugin, advice included."],
+   ["THEME","On the back: toggles between light marble and the dark theme."],
+   ["RESET","On the back: restores the default settings and clears the current analysis."],
+   ["i","This window. Escape or a click outside closes it."]],
+  h4:"THE LAMPS",
+  leds:[["#D4553F","PLOSIVE","a P or B blast hit the diaphragm. Marked in red on the waveform."],
+   ["#4FA8C4","SIBILANCE","an S or SH that is too harsh. Marked in cyan."],
+   ["#E8A33D","CLIP","the signal clipped. Marked in amber on the waveform. Unrecoverable, the take must be redone."],
+   ["#7FBF6A","SIGNAL","voice was detected in the file."]],
+  h5:"THE FIVE VERDICT CARDS",
+  reads:[["LEVEL","The 90th percentile of short-term peaks, what your meter shows. <b>Aim for −15 dBFS.</b> Up to −7 is tolerated as long as nothing clips, beyond that there is no headroom left."],
+   ["SIGNAL / NOISE","The gap between your voice and the room floor. Above 40 dB is clean."],
+   ["SIBILANCE","How far the S sounds rise above the body of the voice. The least reliable of the five: it flags moments to listen to."],
+   ["DISTANCE","The deep-low to mid balance, calibrated on takes at 10, 20 and 30 cm. <b>Independent of gain</b>: it is a ratio between two bands, so turning the volume up does not change it. Too high means too close."],
+   ["GAIN NEEDED","The gain your mic needs at this intensity, computed from its actual sensitivity."]],
+  note:"Everything is computed on your computer, no file is sent anywhere. Level and distance are calibrated on real takes with a Neumann TLM 102. Sibilance is the least reliable of the five readings: it flags moments to listen to, not a verdict."}
+};
+
+const MICS = {
+  "":       {n:{fr:"— je ne sais pas / autre —",en:"— I don't know / other —"}, type:"cond"},
+  "sm7b":   {n:{fr:"Shure SM7B / SM7dB",en:"Shure SM7B / SM7dB"}, type:"dyn", tips:{
+    fr:["Les deux interrupteurs au dos : coupe-bas contre l'effet de proximité, présence pour désembuer.",
+        "Il rejette très bien la pièce : c'est le micro des chambres non traitées."],
+    en:["The two rear switches: low-cut against proximity effect, presence boost to clear the voice.",
+        "It rejects the room very well. This is the mic for untreated bedrooms."]}},
+  "sm58":   {n:{fr:"Shure SM58 / Beta 58",en:"Shure SM58 / Beta 58"}, type:"dyn", tips:{
+    fr:["Fait pour la scène : il ignore largement la pièce, ce qui sauve une prise chez soi.",
+        "Effet de proximité marqué : à moins de 10 cm ça devient vite boueux."],
+    en:["Built for stage: it largely ignores the room, which saves a home take.",
+        "Strong proximity effect: closer than 10 cm it gets muddy fast."]}},
+  "sm57":   {n:{fr:"Shure SM57",en:"Shure SM57"}, type:"dyn", tips:{
+    fr:["Pas de grille anti-pop intégrée comme le SM58 : l'anti-pop externe est indispensable sur la voix."],
+    en:["No built-in pop grille like the SM58: an external pop filter is essential on vocals."]}},
+  "e835":   {n:{fr:"Sennheiser e835",en:"Sennheiser e835"}, type:"dyn", tips:{
+    fr:["Dynamique de scène peu sensible : prévois du gain propre.",
+        "Moins d'effet de proximité qu'un SM58, tu peux chanter plus près sans que ça gonfle."],
+    en:["Low-sensitivity stage dynamic: plan for clean gain.",
+        "Less proximity effect than an SM58, so you can work closer without bloating the lows."]}},
+  "e604":   {n:{fr:"Sennheiser e604",en:"Sennheiser e604"}, type:"dyn", tips:{
+    fr:["Conçu pour les toms et la caisse claire : sur la voix il manque de corps."],
+    en:["Designed for toms and snare: on vocals it lacks body."]}},
+  "md421":  {n:{fr:"Sennheiser MD 421",en:"Sennheiser MD 421"}, type:"dyn", tips:{
+    fr:["Roulette de coupe-bas à cinq positions : commence au milieu pour la voix."],
+    en:["Five-position low-cut wheel: start in the middle for vocals."]}},
+  "tlm102": {n:{fr:"Neumann TLM 102",en:"Neumann TLM 102"}, type:"cond", tips:{
+    fr:["Légère montée dans le haut médium : il flatte la voix mais révèle les sifflantes.",
+        "À 15-20 cm avec un anti-pop, tu as l'équilibre pour lequel il est fait."],
+    en:["Slight upper-mid lift: it flatters the voice but exposes sibilance.",
+        "At 15-20 cm with a pop filter you get the balance it was designed for."]}},
+  "tlm103": {n:{fr:"Neumann TLM 103",en:"Neumann TLM 103"}, type:"cond", tips:{
+    fr:["Très sensible et très détaillé : il capte aussi ta pièce et ton clavier."],
+    en:["Very sensitive and detailed: it also picks up your room and your keyboard."]}},
+  "u87ai":  {n:{fr:"Neumann U 87 Ai",en:"Neumann U 87 Ai"}, type:"cond", tips:{
+    fr:["Trois directivités : en cardioïde tu limites la pièce, en omni tu l'invites, en figure 8 tu captes ce qu'il y a derrière toi.",
+        "Pad −10 dB et coupe-bas sur le corps du micro. Le pad fait passer le SPL max de 117 à 127 dB.",
+        "28 mV/Pa en cardioïde : très sensible, il te faut peu de gain mais il entend tout ce que fait ta pièce."],
+    en:["Three patterns: cardioid limits the room, omni invites it in, figure-8 captures whatever sits behind you.",
+        "−10 dB pad and low-cut on the body. The pad raises max SPL from 117 to 127 dB.",
+        "28 mV/Pa in cardioid: very sensitive, it needs little gain but it hears everything your room does."]}},
+  "u87":    {n:{fr:"Neumann U 87 (version d'origine)",en:"Neumann U 87 (original)"}, type:"cond", tips:{
+    fr:["Environ 10 dB moins sensible que le Ai : prévois du gain propre en plus, surtout sur une voix douce.",
+        "Un peu plus de bruit propre que le Ai, mais davantage de marge avant saturation.",
+        "Capsule K87 d'origine, électronique sans convertisseur DC-DC : c'est de là que vient la différence de caractère."],
+    en:["Around 10 dB less sensitive than the Ai: plan for extra clean gain, especially on a soft voice.",
+        "Slightly more self-noise than the Ai, but more headroom before clipping.",
+        "Original K87 capsule and no DC-DC converter: that is where the difference in character comes from."]}},
+  "nt1":    {n:{fr:"Røde NT1 (5e génération)",en:"Røde NT1 (5th generation)"}, type:"cond", tips:{
+    fr:["Bruit propre de 4 dBA, parmi les plus bas du marché : si ça souffle, le problème vient d'ailleurs.",
+        "Sortie USB et XLR : en USB le gain se règle côté système, pas dans ton DAW."],
+    en:["4 dBA self-noise, among the lowest available: if you hear hiss, it comes from elsewhere.",
+        "USB and XLR outputs: over USB the gain is set in the system, not in your DAW."]}},
+  "nt1a":   {n:{fr:"Røde NT1-A",en:"Røde NT1-A"}, type:"cond", tips:{
+    fr:["Haut du spectre marqué qui exagère les sifflantes. Décale l'axe du micro."],
+    en:["Pronounced top end that exaggerates sibilance. Angle the mic off-axis."]}},
+  "nt5":    {n:{fr:"Røde NT5",en:"Røde NT5"}, type:"cond", tips:{
+    fr:["Petite capsule faite pour les instruments et les prises stéréo, pas pour la voix de près."],
+    en:["Small capsule built for instruments and stereo pairs, not close vocals."]}},
+  "at2020": {n:{fr:"Audio-Technica AT2020",en:"Audio-Technica AT2020"}, type:"cond", tips:{
+    fr:["Ni pad ni coupe-bas : si ça sature ou si ça gronde, la seule solution est de reculer."],
+    en:["No pad, no low-cut: if it clips or rumbles, your only option is to back off."]}},
+  "at2035": {n:{fr:"Audio-Technica AT2035",en:"Audio-Technica AT2035"}, type:"cond", tips:{
+    fr:["Pad −10 dB et coupe-bas 80 Hz à 12 dB/octave : sers-t'en plutôt que de corriger au mix."],
+    en:["−10 dB pad and 80 Hz low-cut at 12 dB/octave: use them rather than fixing it in the mix."]}},
+  "lct440": {n:{fr:"Lewitt LCT 440 Pure",en:"Lewitt LCT 440 Pure"}, type:"cond", tips:{
+    fr:["Réponse volontairement neutre, 7 dBA de bruit propre : ce que tu entends vient de ta voix et de la pièce.",
+        "Ni pad ni filtre : gère la distance plutôt que les boutons."],
+    en:["Deliberately neutral response, 7 dBA self-noise: what you hear is your voice and your room.",
+        "No pad, no filter: manage distance rather than switches."]}},
+  "x1s":    {n:{fr:"sE Electronics X1 S",en:"sE Electronics X1 S"}, type:"cond", tips:{
+    fr:["Pad à deux étages (−10 et −20 dB) et coupe-bas : très tolérant aux voix fortes."],
+    en:["Two-stage pad (−10 and −20 dB) plus low-cut: very forgiving with loud voices."]}},
+  "p220":   {n:{fr:"AKG P220",en:"AKG P220"}, type:"cond", tips:{
+    fr:["Coupe-bas et pad disponibles. Bruit propre de 16 dBA : évite de pousser le gain à fond."],
+    en:["Low-cut and pad available. 16 dBA self-noise: avoid pushing the gain to the limit."]}},
+  "b1":     {n:{fr:"Behringer B-1",en:"Behringer B-1"}, type:"cond", tips:{
+    fr:["Pad −10 dB intégré. 13 dBA de bruit propre, correct pour sa catégorie."],
+    en:["Built-in −10 dB pad. 13 dBA self-noise, solid for its class."]}},
+  "origin": {n:{fr:"Aston Origin",en:"Aston Origin"}, type:"cond", tips:{
+    fr:["Grille anti-pop intégrée, mais un anti-pop externe reste utile sur les P et les B.",
+        "18 dBA de bruit propre : dans une pièce silencieuse tu l'entendras si tu pousses le gain."],
+    en:["Built-in pop grille, but an external pop filter still helps on P and B sounds.",
+        "18 dBA self-noise: in a quiet room you will hear it if you push the gain."]}},
+  "c414":   {n:{fr:"AKG C414",en:"AKG C414"}, type:"cond", tips:{
+    fr:["Choisis bien la directivité : en cardioïde tu limites la pièce, en omni tu l'invites."],
+    en:["Choose the pattern carefully: cardioid limits the room, omni invites it in."]}},
+  "sphere": {n:{fr:"UAD Sphere (LX / DLX)",en:"UAD Sphere (LX / DLX)"}, type:"cond", tips:{
+    fr:["Micro à modélisation : enregistre toujours la piste brute, le modèle se change après."],
+    en:["Modelling mic: always record the raw track, the model can be changed afterwards."]}},
+  "ribbon": {n:{fr:"Micro à ruban",en:"Ribbon microphone"}, type:"ribbon", tips:{
+    fr:["Très peu de sortie : beaucoup de gain propre nécessaire, souvent un booster.",
+        "Ne branche jamais le fantôme à chaud sur un ruban passif."],
+    en:["Very low output: it needs a lot of clean gain, often a booster.",
+        "Never hot-plug phantom power into a passive ribbon."]}},
+  "usb":    {n:{fr:"Micro USB (MV7+, MV6, Yeti, AT2020USB, PodMic USB…)",en:"USB mic (MV7+, MV6, Yeti, AT2020USB, PodMic USB…)"}, type:"usb", tips:{
+    fr:["Le gain se règle dans les réglages système ou l'appli du fabricant, pas seulement dans ton DAW.",
+        "Désactive l'amélioration vocale et la réduction de bruit de Windows : elles abîment la prise.",
+        "Pas de calcul de gain possible : le préampli est intégré au micro."],
+    en:["Gain is set in the system settings or the maker's app, not only in your DAW.",
+        "Disable Windows voice enhancement and noise suppression: they damage the take.",
+        "No gain calculation possible: the preamp is inside the mic."]}}
+};
+
+const IFACES = {
+  "":            {n:{fr:"— je ne sais pas / autre —",en:"— I don't know / other —"}},
+  "scarlettsolo":{n:{fr:"Focusrite Scarlett Solo (4e gen)",en:"Focusrite Scarlett Solo (4th gen)"}, tips:{
+    fr:["Le bouton Air ajoute de la brillance avant conversion : à éviter sur une voix déjà sifflante.",
+        "Moins de gain que les 2i2 et 4i4 : avec un micro dynamique tu seras vite à court."],
+    en:["The Air button adds brightness before conversion: avoid it on an already sibilant voice.",
+        "Less gain than the 2i2 and 4i4: with a dynamic mic you will run out quickly."]}},
+  "scarlett":    {n:{fr:"Focusrite Scarlett 2i2 / 4i4 (4e gen)",en:"Focusrite Scarlett 2i2 / 4i4 (4th gen)"}, tips:{
+    fr:["Les préamplis télécommandés offrent 69 dB de gain, le haut du panier dans cette gamme.",
+        "L'indicateur passe au vert puis à l'orange : vise le vert soutenu."],
+    en:["The remote-controlled preamps deliver 69 dB of gain, the best in this price range.",
+        "The halo turns green then amber: aim for steady green."]}},
+  "ssl2":        {n:{fr:"SSL 2 / SSL 2+",en:"SSL 2 / SSL 2+"}, tips:{
+    fr:["Le bouton 4K ajoute une couleur et des aigus. Utile sur une voix sombre, à éviter si ça siffle."],
+    en:["The 4K button adds colour and top end. Useful on a dark voice, avoid it if sibilance is already there."]}},
+  "audient":     {n:{fr:"Audient iD4 / iD14",en:"Audient iD4 / iD14"}, tips:{
+    fr:["Préamplis Class-A plutôt neutres. 58 dB de gain : juste pour un dynamique très peu sensible."],
+    en:["Fairly neutral Class-A preamps. 58 dB of gain: tight for a very low-output dynamic."]}},
+  "evo":         {n:{fr:"Audient EVO 4 / EVO 8",en:"Audient EVO 4 / EVO 8"}, tips:{
+    fr:["Le Smartgain règle le niveau tout seul : refais un test après l'avoir utilisé."],
+    en:["Smartgain sets the level by itself: run a fresh test after using it."]}},
+  "motu":        {n:{fr:"MOTU M2 / M4",en:"MOTU M2 / M4"}, tips:{
+    fr:["L'écran LCD affiche les niveaux d'entrée en temps réel, plus fiable que des LED."],
+    en:["The LCD shows input levels in real time, more reliable than LEDs."]}},
+  "ur22c":       {n:{fr:"Steinberg UR22C",en:"Steinberg UR22C"}, tips:{
+    fr:["Gain de +6 à +60 dB. Un compresseur DSP est disponible à l'entrée : enregistre sans."],
+    en:["Gain from +6 to +60 dB. A DSP compressor sits on the input: record without it."]}},
+  "umc":         {n:{fr:"Behringer UMC22 / UMC202HD / UMC404HD",en:"Behringer UMC22 / UMC202HD / UMC404HD"}, tips:{
+    fr:["Préamplis Midas corrects, mais moins de marge que la moyenne : le souffle monte vite à fond."],
+    en:["Decent Midas preamps, but less headroom than average: hiss rises quickly at full gain."]}},
+  "presonus":    {n:{fr:"PreSonus AudioBox / Studio 24c",en:"PreSonus AudioBox / Studio 24c"}, tips:{
+    fr:["Gain modéré : avec un micro peu sensible tu risques de manquer de niveau."],
+    en:["Moderate gain: with a low-output mic you may run short of level."]}},
+  "minifuse":    {n:{fr:"Arturia MiniFuse",en:"Arturia MiniFuse"}, tips:{
+    fr:["Préamplis propres et neutres, un peu justes pour un dynamique très sourd."],
+    en:["Clean, neutral preamps, a little tight for a very dark dynamic mic."]}},
+  "komplete":    {n:{fr:"NI Komplete Audio 1 / 2 / 6",en:"NI Komplete Audio 1 / 2 / 6"}, tips:{
+    fr:["Vérifie que l'alimentation fantôme est bien active si tu es sur un statique."],
+    en:["Check that phantom power is actually on if you are using a condenser."]}},
+  "volt":        {n:{fr:"Universal Audio Volt",en:"Universal Audio Volt"}, tips:{
+    fr:["Le mode Vintage ajoute une saturation de transfo à l'entrée : enregistre d'abord sans."],
+    en:["Vintage mode adds transformer saturation on the input: record without it first."]}},
+  "apollo":      {n:{fr:"UA Apollo (Twin / Solo / x4)",en:"UA Apollo (Twin / Solo / x4)"}, tips:{
+    fr:["Les préamplis Unison se règlent depuis la Console UAD, pas seulement dans ton DAW.",
+        "Une émulation Unison change le gain d'entrée : refais ton niveau après l'avoir activée."],
+    en:["Unison preamps are set from UAD Console, not only in your DAW.",
+        "A Unison emulation changes input gain: reset your level after enabling it."]}},
+  "rme":         {n:{fr:"RME Babyface / Fireface",en:"RME Babyface / Fireface"}, tips:{
+    fr:["TotalMix gère le routage : vérifie que tu n'enregistres pas le retour en plus du micro."],
+    en:["TotalMix handles routing: make sure you are not recording the monitor path along with the mic."]}}
+};
+
+const PRES = {
+  "":        {n:{fr:"— aucun / je n'en ai pas —",en:"— none —"}},
+  "booster": {n:{fr:"Booster de gain (Cloudlifter, FetHead, Triton…)",en:"Gain booster (Cloudlifter, FetHead, Triton…)"}, tips:{
+    fr:["Il ajoute environ 25 dB propres avant ton préampli : baisse d'autant le gain de la carte.",
+        "Il a besoin de l'alimentation fantôme pour fonctionner, même sur un micro dynamique."],
+    en:["It adds around 25 dB of clean gain before your preamp: lower the interface gain by the same amount.",
+        "It needs phantom power to work, even on a dynamic mic."]}},
+  "1073":    {n:{fr:"Type 1073 (Neve, Warm WA73, Golden Age, Heritage, BAE…)",en:"1073-style (Neve, Warm WA73, Golden Age, Heritage, BAE…)"}, tips:{
+    fr:["Beaucoup de couleur et de grave. Sur une voix déjà grave, coupe sous 80 Hz à la prise.",
+        "Monte le gain d'entrée et baisse la sortie pour avoir plus de caractère de transfo."],
+    en:["Lots of colour and low end. On an already deep voice, cut below 80 Hz while tracking.",
+        "Push the input gain and pull the output down for more transformer character."]}},
+  "api":     {n:{fr:"Type API (312, 512c, 3124…)",en:"API-style (312, 512c, 3124…)"}, tips:{
+    fr:["Transitoires rapides et médiums en avant : très lisible sur une voix, parfois dur sur les sifflantes."],
+    en:["Fast transients and forward mids: very legible on vocals, sometimes harsh on sibilance."]}},
+  "isa":     {n:{fr:"Focusrite ISA One / 428 / 828",en:"Focusrite ISA One / 428 / 828"}, tips:{
+    fr:["Le sélecteur d'impédance change le timbre du micro : teste les positions avant de graver la prise."],
+    en:["The impedance selector changes the mic's tone: try the positions before committing."]}},
+  "tube":    {n:{fr:"Préampli à lampe (UA 610, Manley, Vintech, Avalon…)",en:"Tube preamp (UA 610, Manley, Vintech, Avalon…)"}, tips:{
+    fr:["Laisse chauffer quelques minutes avant la prise.",
+        "Pousser le gain d'entrée ajoute de la saturation : agréable, mais irréversible une fois enregistré."],
+    en:["Let it warm up for a few minutes before tracking.",
+        "Pushing the input gain adds saturation: pleasant, but irreversible once recorded."]}},
+  "clean":   {n:{fr:"Préampli propre (Grace, Millennia, Daking, SSL PureDrive…)",en:"Clean preamp (Grace, Millennia, Daking, SSL PureDrive…)"}, tips:{
+    fr:["Beaucoup de gain disponible et peu de couleur : parfait pour un dynamique ou un ruban.",
+        "Tout ce que tu entends vient du micro et de la pièce. C'est là qu'il faut travailler."],
+    en:["Plenty of gain and very little colour: ideal for a dynamic or a ribbon.",
+        "Everything you hear comes from the mic and the room. That is where the work is."]}}
+};
+
+const INPROC = {
+  "":        {n:{fr:"— aucun, j'enregistre à sec —",en:"— none, I record dry —"}},
+  "opto":    {n:{fr:"Compresseur opto (LA-2A, WA-2A…)",en:"Opto compressor (LA-2A, WA-2A…)"}, tips:{
+    fr:["Compresseur optique, lent à réagir. À la prise, reste léger : 2 à 4 dB de réduction maximum.",
+        "Ce qui est compressé est gravé dans le fichier. Dans le doute, enregistre à sec."],
+    en:["Optical compressor, slow to react. While tracking stay light: 2 to 4 dB of reduction at most.",
+        "Whatever you compress is baked into the file. When in doubt, record dry."]}},
+  "fet":     {n:{fr:"Compresseur FET (1176, 76-KT…)",en:"FET compressor (1176, 76-KT…)"}, tips:{
+    fr:["Très rapide, il attrape les transitoires. À la prise, ratio 4:1 et 2 à 3 dB suffisent.",
+        "Attaque trop rapide et tu écrases les consonnes : laisse-la plutôt vers le milieu."],
+    en:["Very fast, it catches transients. While tracking, 4:1 and 2 to 3 dB is enough.",
+        "Too fast an attack crushes consonants: leave it around the middle."]}},
+  "vca":     {n:{fr:"Compresseur VCA / à seuil",en:"VCA / threshold compressor"}, tips:{
+    fr:["Efficace pour tenir un niveau, mais sans retour en arrière possible. 3 dB maximum à la prise."],
+    en:["Effective for holding a level, but there is no going back. 3 dB maximum while tracking."]}},
+  "pultec":  {n:{fr:"EQ passif type Pultec (EQP…)",en:"Pultec-style passive EQ (EQP…)"}, tips:{
+    fr:["Le tour de passe-passe grave fonctionne surtout au mix. À la prise, léger ou pas du tout.",
+        "Corriger à la prise t'enlève le droit de changer d'avis après."],
+    en:["The famous low-end trick belongs in the mix. While tracking, light or not at all.",
+        "Correcting at the source takes away your right to change your mind later."]}},
+  "channel": {n:{fr:"Tranche de console complète (VT-737, VoxBox, LA-610…)",en:"Full channel strip (VT-737, VoxBox, LA-610…)"}, tips:{
+    fr:["Tu as préampli, EQ et compresseur en série : n'utilise que le préampli pour la prise.",
+        "Si tu tiens à compresser, garde la réduction sous 3 dB et enregistre une deuxième piste à sec si tu peux."],
+    en:["You have preamp, EQ and compressor in series: use only the preamp while tracking.",
+        "If you insist on compressing, keep reduction under 3 dB and record a dry second track if you can."]}}
+};
+
+const ROOMS = {
+  "none":  {n:{fr:"Pas traitée du tout",en:"Not treated at all"}, tips:{
+    fr:["Rapproche-toi du micro et baisse le gain : plus tu es près, moins la pièce rentre.",
+        "Évite le centre de la pièce et les angles. Place-toi face à une surface absorbante, pas à un mur nu.",
+        "Une couette, un rideau épais ou une armoire ouverte derrière le micro change tout, et ça coûte zéro."],
+    en:["Move closer to the mic and lower the gain: the closer you are, the less room gets in.",
+        "Avoid the centre of the room and the corners. Face an absorbent surface, not a bare wall.",
+        "A duvet, a thick curtain or an open wardrobe behind the mic changes everything, and costs nothing."]}},
+  "light": {n:{fr:"Un peu traitée",en:"Lightly treated"}, tips:{
+    fr:["Concentre l'absorbant là où ça compte : derrière le micro et aux premières réflexions latérales.",
+        "Les panneaux fins traitent les aigus mais pas les graves : si ça gronde, c'est un problème de volume de pièce."],
+    en:["Concentrate absorption where it matters: behind the mic and at the first side reflections.",
+        "Thin panels handle highs, not lows: if it rumbles, that is a room-volume problem."]}},
+  "full":  {n:{fr:"Traitée",en:"Treated"}, tips:{
+    fr:["Tu peux t'éloigner un peu du micro pour gagner en naturel sans payer la pièce.",
+        "Si une résonance persiste malgré le traitement, c'est un mode de pièce : déplace-toi de 30 cm et réécoute."],
+    en:["You can step back a little for a more natural sound without paying for the room.",
+        "If a resonance survives the treatment, it is a room mode: move 30 cm and listen again."]}}
+};
+
+const TESS = {
+  "bass":  {n:{fr:"Basse",en:"Bass"}, f0:95,  prox:+4, sib:-2},
+  "bar":   {n:{fr:"Baryton",en:"Baritone"}, f0:120, prox:+2, sib:-1},
+  "ten":   {n:{fr:"Ténor",en:"Tenor"}, f0:150, prox:0, sib:0},
+  "alto":  {n:{fr:"Alto / Contralto",en:"Alto / Contralto"}, f0:200, prox:-2, sib:+1},
+  "mezzo": {n:{fr:"Mezzo-soprano",en:"Mezzo-soprano"}, f0:240, prox:-3, sib:+1.5},
+  "sop":   {n:{fr:"Soprano",en:"Soprano"}, f0:280, prox:-4, sib:+2},
+  "":      {n:{fr:"— je ne sais pas —",en:"— I don't know —"}, f0:160, prox:0, sib:0}
+};
+
+const SPL = {
+  "78":{fr:"Voix parlée douce",en:"Soft spoken voice"}, "85":{fr:"Voix parlée normale",en:"Normal spoken voice"},
+  "80":{fr:"Rap chuchoté / murmuré",en:"Whispered rap"}, "86":{fr:"Rap posé, flow calme",en:"Laid-back rap"},
+  "92":{fr:"Rap normal",en:"Normal rap"}, "99":{fr:"Rap fort, punché",en:"Loud, punchy rap"},
+  "106":{fr:"Rap crié / énergie scène",en:"Shouted rap / stage energy"},
+  "88":{fr:"Chant doux",en:"Soft singing"}, "96":{fr:"Chant normal",en:"Normal singing"},
+  "104":{fr:"Chant puissant / belting",en:"Powerful singing / belting"}
+};
+
+const SPLGROUP = {
+  "fr":{"Voix parlée":["78","85"],"Rap":["80","86","92","99","106"],"Chant":["88","96","104"]},
+  "en":{"Spoken":["78","85"],"Rap":["80","86","92","99","106"],"Singing":["88","96","104"]}
+};
+
+const MICSPEC = {
+  "sm7b":   {s:1.12, noise:null, spl:null, ok:1, src:"Shure, guide officiel SM7B (−59 dBV/Pa)"},
+  "sm58":   {s:1.85, noise:null, spl:null, ok:1, src:"Shure, fiche SM58 (−54,5 dBV/Pa)"},
+  "sm57":   {s:1.60, noise:null, spl:null, ok:1, src:"Shure, guide SM57 (−56 dBV/Pa)"},
+  "e835":   {s:2.70, noise:null, spl:null, ok:1, src:"Sennheiser, page produit e835"},
+  "e604":   {s:1.80, noise:null, spl:null, ok:1, src:"Sennheiser, page produit e604"},
+  "tlm102": {s:11,   noise:12,  spl:144, ok:1, src:"Neumann, page produit TLM 102"},
+  "tlm103": {s:23,   noise:7,   spl:138, ok:1, src:"Neumann, page produit TLM 103"},
+  "u87ai":  {s:28,   noise:12,  spl:117, ok:1, src:"Neumann, page produit U 87 Ai (cardioïde ; 127 dB avec le pad)"},
+  "u87":    {s:8,    noise:16,  spl:117, ok:0, src:"U 87 d'origine — environ 10 dB sous le Ai, chiffres de source tierce à confirmer"},
+  "nt1":    {s:25,   noise:4,   spl:142, ok:1, src:"Røde, guide NT1 5e génération"},
+  "lct440": {s:27.4, noise:7,   spl:140, ok:1, src:"Lewitt, fiche technique LCT 440 Pure"},
+  "x1s":    {s:30,   noise:9,   spl:140, ok:1, src:"sE Electronics, manuel X1 S"},
+  "b1":     {s:20,   noise:13,  spl:138, ok:1, src:"Behringer, manuel B-1"},
+  "at2035": {s:22,   noise:12,  spl:148, ok:0, src:"AT2035 — pad et coupe-bas confirmés par Audio-Technica, sensibilité relevée chez un revendeur"},
+  "at2020": {s:14.1, noise:20,  spl:144, ok:0, src:"AT2020 — chiffres de source tierce, à confirmer"},
+  "nt1a":   {s:25,   noise:5,   spl:137, ok:0, src:"NT1-A — bruit propre officiel Røde, sensibilité de source tierce"},
+  "nt5":    {s:12,   noise:16,  spl:null,ok:0, src:"NT5 — chiffres de source tierce"},
+  "p220":   {s:20,   noise:16,  spl:155, ok:0, src:"P220 — chiffres de source tierce"},
+  "origin": {s:23.7, noise:18,  spl:null,ok:0, src:"Aston Origin — sensibilité relevée en test, SPL max contradictoire selon les sources"}
+};
+
+const IFGAIN = {
+  "scarlett":    {g:69, ok:1, src:"Focusrite, specs Scarlett 2i2 / 4i4 4e gen (plage 69 dB)"},
+  "ur22c":       {g:60, ok:1, src:"Steinberg, specs UR22C (+6 à +60 dB)"},
+  "motu":        {g:60, ok:0, src:"MOTU M2 — source tierce"},
+  "audient":     {g:58, ok:0, src:"Audient iD4 MkII — source tierce"},
+  "scarlettsolo":{g:56, ok:0, src:"Scarlett Solo 4e gen — sources tierces, 56 à 57 dB"},
+  "ssl2":        {g:null, ok:0, src:"SSL 2 — sources contradictoires (56 ou 64 dB), non retenu"}
+};
+
+const GAINLOC = {
+  apollo:{fr:"dans la Console UAD, pas seulement dans ton DAW",en:"in UAD Console, not only in your DAW"},
+  evo:{fr:"à la main — désactive le Smartgain pour garder le contrôle",en:"by hand — disable Smartgain to keep control"},
+  ur22c:{fr:"sur la molette d'entrée, le compresseur DSP désactivé",en:"on the input knob, with the DSP compressor off"},
+  "":{fr:"sur la molette de gain de ta carte",en:"on your interface's gain knob"}
+};
+
+const U = k => UI[LANG][k];
+
+
+const ST = k => STP[LANG][k];
+
+
+const C = k => CRD[LANG][k];
+
+
+const t = o => (o && typeof o==="object" && !Array.isArray(o)) ? (o[LANG]||o.fr) : o;
+
+
+const PREBOOST = { "booster":25 };
+
+
+function gainCalc(ci){
+  const m = MICSPEC[ci.mic], i = IFGAIN[ci.iface];
+  if(!m || m.s==null) return null;
+  const spl = parseFloat(ci.spl||"85");
+  const dBV = 20*Math.log10(m.s/1000) + (spl - 94);
+  const need = -12 - dBV;                       // cible ~ -12 dBV avant conversion
+  const boost = PREBOOST[ci.pre] || 0;
+  const avail = (i && i.g!=null) ? i.g + boost : null;
+  return {need, avail, boost, mic:m, iface:i, spl};
+}
+
+async function toMono(buf){
+  const sr=buf.sampleRate, n=Math.min(buf.length, Math.floor(sr*MAXSEC));
+  const src=new OfflineAudioContext(1,n,sr), tmp=src.createBuffer(1,n,sr), o=tmp.getChannelData(0);
+  for(let c=0;c<buf.numberOfChannels;c++){
+    const d=buf.getChannelData(c);
+    for(let i=0;i<n;i++) o[i]+=d[i]/buf.numberOfChannels;
+  }
+  /* rééchantillonnage en 24 kHz via le contexte de rendu */
+  const out=new OfflineAudioContext(1, Math.ceil(n/sr*ASR), ASR);
+  const node=out.createBufferSource(); node.buffer=tmp; node.connect(out.destination); node.start();
+  return await out.startRendering();
+}
+
+async function renderBand(mono, chain){
+  const ctx=new OfflineAudioContext(1,mono.length,mono.sampleRate);
+  const src=ctx.createBufferSource(); src.buffer=mono; let node=src;
+  for(const f of chain){
+    const b=ctx.createBiquadFilter(); b.type=f.type; b.frequency.value=f.freq;
+    if(f.Q!=null) b.Q.value=f.Q; node.connect(b); node=b;
+  }
+  node.connect(ctx.destination); src.start();
+  return (await ctx.startRendering()).getChannelData(0);
+}
+
+function envelope(data, sr, winMs=20){
+  const win=Math.max(64,Math.floor(sr*winMs/1000)), hop=Math.floor(win/2), env=[], pk=[];
+  for(let i=0;i+win<=data.length;i+=hop){
+    let s=0,m=0;
+    for(let j=i;j<i+win;j++){ const v=data[j]; s+=v*v; const a=v<0?-v:v; if(a>m) m=a; }
+    env.push(Math.sqrt(s/win)); pk.push(m);
+  }
+  return {env,hop,pk};
+}
+
+async function analyse(buf, ctxInfo){
+  const sr=ASR, mono=await toMono(buf), raw=mono.getChannelData(0);
+  let peak=0, clipped=0;
+  for(let i=0;i<raw.length;i++){ const a=Math.abs(raw[i]); if(a>peak)peak=a; if(a>=0.994)clipped++; }
+
+  // bande grave calée sur la tessiture
+  const f0 = (TESS[ctxInfo.tess]||TESS[""]).f0;
+  const lowF = Math.max(90, Math.min(260, f0*1.5));
+
+  /* une bande à la fois : on extrait l'enveloppe puis on libère le buffer */
+  const one=async ch=>{ const b=await renderBand(mono,ch); const e=envelope(b,sr); return e; };
+  const eFull=await one([{type:"highpass",freq:25,Q:QDB}]);
+  const eLow =await one([{type:"lowpass",freq:120,Q:QDB},{type:"lowpass",freq:120,Q:QDB}]);
+  const eMid =await one([{type:"bandpass",freq:1800,Q:0.9},{type:"bandpass",freq:1800,Q:0.9}]);
+  const eSib =await one([{type:"bandpass",freq:6500,Q:1.1},{type:"bandpass",freq:6500,Q:1.1}]);
+  const fE=eFull.env, fullPk=eFull.pk, lE=eLow.env, mE=eMid.env, sE=eSib.env;
+  const hop=eFull.hop;
+  const N=Math.min(fE.length,lE.length,mE.length,sE.length);
+  const fDb=fE.slice(0,N).map(db);
+  /* on conserve les enveloppes par trame : recalculer une sélection ne refait pas le filtrage */
+  return {sr, hop, N, fDb, lowF, dur:raw.length/sr, channels:buf.numberOfChannels,
+    peakDb:db(peak), clipped, truncated: buf.duration>MAXSEC+0.5,
+    bands:{fE,lE,mE,sE,fullPk}};
+}
+
+/* Agrège les mesures sur une plage de trames [i0,i1). Sans plage, c'est toute la prise. */
+function aggregate(R, i0, i1){
+  const {sr,hop,N,fDb}=R, {fE,lE,mE,sE,fullPk}=R.bands;
+  i0 = Math.max(0, i0|0); i1 = Math.min(N, i1==null?N:(i1|0));
+  if(i1-i0 < 4) { i0=0; i1=N; }
+  const idx=[]; for(let i=i0;i<i1;i++) idx.push(i);
+
+  const real=idx.filter(i=>fDb[i]>-90).map(i=>fDb[i]);
+  const gatedRatio = 1 - real.length/idx.length;
+  const noiseDb = real.length>=10 ? percentile(real,0.10) : percentile(idx.map(i=>fDb[i]),0.10);
+  const gate=noiseDb+12;
+  const speech=idx.filter(i=>fDb[i]>gate);
+  const hasSpeech = speech.length > idx.length*0.03;
+
+  const rmsDb = speech.length ? db(Math.sqrt(speech.reduce((s,i)=>s+fE[i]*fE[i],0)/speech.length)) : -99;
+  const snr = rmsDb - noiseDb;
+  const workDb = speech.length ? percentile(speech.map(i=>db(fullPk[i])),0.90) : -99;
+  const bandAvg = a => speech.length ? db(Math.sqrt(speech.reduce((s,i)=>s+a[i]*a[i],0)/speech.length)) : -99;
+  const sibExc=[];
+  for(const i of speech){ const d=db(sE[i])-db(mE[i]); if(d>0) sibExc.push(d); }
+  const sibRatio = sibExc.length ? percentile(sibExc,0.90) : 0;
+  const proxRatio = bandAvg(lE) - bandAvg(mE);
+
+  const lDb=i=>db(lE[i]), sDb=i=>db(sE[i])-db(mE[i]);
+  const lMed = speech.length ? median(speech.map(lDb)) : 0;
+  const sMed = speech.length ? median(speech.map(sDb)) : 0;
+  const sibs=[], clips=[];
+  for(let i=Math.max(1,i0); i<Math.min(N-1,i1); i++){
+    if(fDb[i]<=gate) continue;
+    const t=i*hop/sr;
+    /* DÉTECTION DE PLOSIVES RETIRÉE — 21/10/2026. Ne pas reconstruire sans données neuves.
+       Testé contre 15 plosives marquées à l'oreille par Léo sur deux prises (bouton ⌖) :
+         · excédent de la bande <120 Hz sur sa médiane ....... rang 60 % / 43 % vs hasard
+         · sub (28-80 Hz) moins fondamental (110-320 Hz) ..... rang 64 % / 68 %
+         · pente d'attaque du sub sur 60 ms ................. rang 74 % / 60 %
+         · montée de niveau large bande sur 30 ms ........... rang 72 % / 81 %  ← la meilleure
+       Un détecteur sans information tombe à 50 %. Même la meilleure grandeur plafonne à
+       26 % de précision : pour attraper 14 des 15 marques il faut afficher 76 repères.
+       Cause physique : à 20 cm d'un micro statique, un « P » est un transitoire large bande,
+       pas un coup de grave. Le modèle « plosive = bosse sous 120 Hz » ne vaut qu'au contact.
+       Pour y revenir il faudrait des prises volontaires (P/B/T répétés) à 5, 10 et 20 cm,
+       avec et sans anti-pop, et les timecodes posés au ⌖. */
+    if(sDb(i)-sMed>9 && sDb(i)>=sDb(i-1) && sDb(i)>=sDb(i+1)
+       && (!sibs.length || t-sibs[sibs.length-1].t>0.18)) sibs.push({t,x:sDb(i)-sMed});
+  }
+  for(const i of idx){ if(db(fullPk[i])>=-0.05){ const t=i*hop/sr;
+    if(!clips.length || t-clips[clips.length-1].t>0.25) clips.push({t,x:0}); } }
+  const top=(a,n)=>[...a].sort((p,q)=>q.x-p.x).slice(0,n).sort((p,q)=>p.t-q.t);
+  const clipped = clips.length ? Math.round(clips.length*21) : 0;
+
+  return {...R, i0, i1, selected:(i0>0||i1<N),
+    rmsDb, noiseDb, snr, workDb, sibRatio, proxRatio, gatedRatio,
+    clipped: (i0>0||i1<N) ? clipped : R.clipped,
+    clips:clips.slice(0,12),
+    sibilants:top(sibs,60), sibCount:sibs.length, hasSpeech};
+}
+
+const db = v => 20*Math.log10(Math.max(v,1e-12));
+
+const fmt = (v,d=1) => (v>0?"+":"") + v.toFixed(d);
+
+const ts = s => s.toFixed(2).replace(".",",")+"s";
+
+function median(a){ if(!a.length) return 0; const b=[...a].sort((x,y)=>x-y); const m=b.length>>1;
+  return b.length%2 ? b[m] : (b[m-1]+b[m])/2; }
+
+function percentile(a,p){ if(!a.length) return 0; const b=[...a].sort((x,y)=>x-y);
+  return b[Math.min(b.length-1,Math.max(0,Math.floor(p*(b.length-1))))]; }
+
+const MAXSEC = 300;
+/* l'analyse tourne à 24 kHz : la bande la plus haute est à 6,5 kHz, donc 12 kHz de Nyquist suffisent.
+   Deux fois moins de mémoire et de calcul qu'à 48 kHz, pour un écart mesuré de 0,2 dB. */
+const ASR = 24000;
+/* ⚠️ Web Audio : pour lowpass et highpass, Q est exprimé en DÉCIBELS (alpha = sin(w0)/(2·10^(Q/20))).
+   -3.0103 dB donne un Q effectif de 0,7071, soit un Butterworth sans résonance.
+   Avec Q:0.7 le filtre résonnait à 120 Hz, pile sur le fondamental d'une voix masculine,
+   et gonflait la mesure de distance de 7 dB. */
+const QDB = -3.0103;
+
+
+/* ========= rendu ========= */
+function fill(sel,obj,def){
+  const el=$(sel);
+  el.innerHTML=Object.entries(obj).map(([k,v])=>
+    `<option value="${k}"${k===def?" selected":""}>${t(v.n)}</option>`).join("");
+}
+function fillTess(){
+  const cur=$("#tess").value||"";
+  $("#tess").innerHTML=`<option value="">${t(TESS[""].n)}</option>`
+    +`<optgroup label="${U("tessM")}">`+["bass","bar","ten"].map(k=>
+      `<option value="${k}">${t(TESS[k].n)}</option>`).join("")+`</optgroup>`
+    +`<optgroup label="${U("tessF")}">`+["alto","mezzo","sop"].map(k=>
+      `<option value="${k}">${t(TESS[k].n)}</option>`).join("")+`</optgroup>`;
+  $("#tess").value=cur;
+}
+function fillSpl(){
+  const cur=$("#spl").value||"92";
+  $("#spl").innerHTML=Object.entries(SPLGROUP[LANG]).map(([g,ks])=>
+    `<optgroup label="${g}">`+ks.map(k=>`<option value="${k}">${t(SPL[k])}</option>`).join("")+`</optgroup>`).join("");
+  $("#spl").value=cur;
+}
+function ctxInfo(){ return {iface:$("#iface").value,pre:$("#pre").value,inproc:$("#inproc").value,
+  mic:$("#mic").value,room:$("#room").value,tess:$("#tess").value,spl:$("#spl").value}; }
+
+function step(n,title,body,warn){
+  return `<div class="stp${warn?" warn":""}"><div class="n">${n}</div>
+    <div><h6>${title}</h6><p>${body}</p></div></div>`;
+}
+function emptyCards(){
+  const defs=[[U("capP"),U("capP")===  "NIVEAU" ? "Niveau de travail, cible −18 à −15 dBFS" : "Working level, target −18 to −15 dBFS"],
+    [U("capN"), LANG==="fr"?"Écart entre ta voix et le fond de la pièce":"Gap between your voice and the room floor"],
+    [U("capS"), LANG==="fr"?"De combien les S dépassent la voix":"How far the S sounds rise above the voice"],
+    [U("capD"), LANG==="fr"?"Ta position au micro, lue sur le grave":"Your position at the mic, read from the lows"]];
+  $("#cards").innerHTML = defs.map(d=>
+    `<div class="card"><div class="l">${d[0]}</div><div class="v">—</div>
+     <div class="d" style="color:var(--mut);opacity:.7">${U("waitCard")}</div>
+     <div class="t">${d[1]}</div></div>`).join("");
+}
+function card(lab,val,st,verdict,tip){
+  return `<div class="card ${st}"><div class="l">${lab}</div><div class="v">${val}</div>
+    <div class="d">${verdict}</div><div class="t">${tip}</div></div>`;
+}
+
+function buildBefore(){
+  const ci=ctxInfo();
+  const M=MICS[ci.mic]||MICS[""], T=TESS[ci.tess]||TESS[""], R=ROOMS[ci.room]||ROOMS.none;
+  const spl=parseFloat(ci.spl||"92"), lab=t(SPL[ci.spl])||"";
+  const usb=M.type==="usb", dyn=M.type==="dyn"||M.type==="ribbon", spec=MICSPEC[ci.mic];
+  let n=0,h="";
+  h+=step(++n, ST("room")+" — "+t(R.n).toLowerCase(), t(R.tips).join(" "));
+  if(usb) h+=step(++n,ST("usbT"),ST("usbB"));
+  else if(M.type==="ribbon") h+=step(++n,ST("ribT"),ST("ribB"),true);
+  else if(dyn) h+=step(++n,ST("dynT"),ST("dynB")+(ci.pre==="booster"?ST("dynBoost"):ST("dynNo")));
+  else h+=step(++n,ST("conT"),ST("conB"));
+  const hpfMics=["at2035","x1s","p220","b1","c414","sm7b","md421","origin","u87ai","u87"];
+  const padMics=["at2035","x1s","p220","b1","c414","u87ai"];
+  let f=[];
+  if(hpfMics.includes(ci.mic)) f.push((T.f0<=130||spl<=86)?ST("hpfOn"):ST("hpfMaybe"));
+  if(padMics.includes(ci.mic)&&spl>=99) f.push(ST("padOn"));
+  if(spec&&spec.spl&&spl>=104&&!padMics.includes(ci.mic)) f.push(ST("splHigh")(spec.spl));
+  if(ci.mic==="sm7b") f.push(ST("sm7b"));
+  if(f.length) h+=step(++n,ST("swT"),f.join(" "));
+  h+=step(++n,ST("popT"),ST("popB")+(ci.mic==="origin"?ST("popOrigin"):"")
+    +(ci.mic==="sm57"?ST("popSm57"):"")+ST("popEnd"));
+  let dist=dyn?"5-10 cm":(ci.room==="full"?"20-25 cm":"15-20 cm");
+  if(spl>=99) dist=dyn?"10-15 cm":"25-30 cm";
+  if(spl<=80) dist=dyn?"3-6 cm":"10-15 cm";
+  h+=step(++n,ST("posT")(dist),(dyn?ST("posDyn"):"")+(ci.room==="none"?ST("posRoom"):"")
+    +(spl>=99?ST("posLoud"):"")+(spl<=80?ST("posSoft"):"")+ST("posEnd"));
+  if(ci.inproc) h+=step(++n,ST("procT"),
+    ST("procB")(t(INPROC[ci.inproc].n).toLowerCase().replace(/ \(.*/,"")),true);
+  const gc=gainCalc(ci);
+  if(usb) h+=step(++n,ST("gUsbT"),ST("gUsbB"));
+  else if(gc){
+    const need=Math.round(gc.need), loc=GAINLOC[ci.iface]?t(GAINLOC[ci.iface]):t(GAINLOC[""]);
+    let body=ST("gB")(need,lab,loc), warn=false;
+    if(gc.avail!=null){
+      const a=Math.round(gc.avail), m=Math.round(gc.avail-gc.need);
+      if(m<0){warn=true;body+=ST("gMiss")(a,-m);} else if(m<10){warn=true;body+=ST("gTight")(a);}
+      else body+=ST("gOk")(a,m);
+    }
+    h+=step(++n,ST("gT")(need),body,warn);
+  } else h+=step(++n,ST("gEarT"),ST("gEarB"));
+  h+=step(++n,ST("testT"),ST("testB"));
+  h+=step(++n,ST("recT"),ST("recB"));
+  $("#before").innerHTML=h;
+}
+
+function show(r,ci){
+  const T=TESS[ci.tess]||TESS[""], M=MICS[ci.mic]||MICS[""];
+  const dynBonus=(M.type==="dyn"||M.type==="ribbon")?-2:0;
+  $("#meta").textContent=`${r.dur.toFixed(1)} ${U("sec")} · ${r.sr/1000} kHz · ${r.channels===1?U("mono"):U("stereo")}`;
+  drawWave(r);
+  $("#ledS").classList.toggle("on",r.sibCount>0);
+  $("#ledC").classList.toggle("on",r.clipped>20);
+  $("#ledR").classList.toggle("on",r.hasSpeech);
+
+  if(!r.hasSpeech){
+    $("#cards").innerHTML=card("Signal","—","bad",U("noSig"),U("noSigB"));
+    $("#fixAll").innerHTML=`<li>${U("noSigD")}</li>`;
+    $("#sumOk").innerHTML=""; $("#sumKo").innerHTML=`<p class="none">${U("noSigD")}</p>`;
+    return;
+  }
+  const todo=[]; let cards=""; const S=[];
+  /* niveau de travail — bon entre −18 et −15, trop fort au-dessus de −10, trop faible sous −20 */
+  const w=r.workDb, dynMic=(M.type==="dyn"||M.type==="ribbon");
+  let lvl="ok";
+  if(r.clipped>20){ cards+=card(U("capP"),fmt(w),"bad",C("clipV"),C("clipT")(r.clipped)); S.push([U("capP"),"bad",C("clipV")]); todo.push(C("clipDo")); }
+  else if(w>-7){ cards+=card(U("capP"),fmt(w),"bad",C("hotV"),C("hotT")); S.push([U("capP"),"bad",C("hotV")]); todo.push(C("hotDo")); lvl="hot"; }
+  else if(w>-12){ cards+=card(U("capP"),fmt(w),"warn",C("tolV"),C("tolT")); S.push([U("capP"),"warn",C("tolV")]); todo.push(C("tolDo")); }
+  else if(w<-24){ cards+=card(U("capP"),fmt(w),"bad",C("lowV"),C("lowT")); S.push([U("capP"),"bad",C("lowV")]);
+    todo.push(dynMic?C("lowDoDyn"):C("lowDo")); lvl="low"; }
+  else if(w<-20){ cards+=card(U("capP"),fmt(w),"warn",C("lowV"),C("lowT")); S.push([U("capP"),"warn",C("lowV")]);
+    todo.push(dynMic?C("lowDoDyn"):C("lowDo")); lvl="low"; }
+  else { cards+=card(U("capP"),fmt(w),"ok",C("okV"),C("okT")); S.push([U("capP"),"ok",C("okV")]); }
+
+  let st=r.snr>40?"ok":(r.snr>25?"warn":"bad");
+  cards+=card(U("capN"),fmt(r.snr,0),st,st==="ok"?C("snrOk"):(st==="warn"?C("snrWarn"):C("snrBad")),
+    C("snrT")(fmt(r.noiseDb,0),st==="ok")+(r.gatedRatio>0.35?" "+C("edited"):""));
+  S.push([U("capN"),st,st==="ok"?C("snrOk"):(st==="warn"?C("snrWarn"):C("snrBad"))]);
+  if(st!=="ok") todo.push(C("snrDo"));
+
+
+  /* seuils permissifs : l'écart mesuré entre une prise jugée propre et une prise
+     volontairement sifflante n'est que de 0,7 dB. On informe, on n'accuse pas. */
+  const sibOk=20+T.sib+dynBonus, sibBad=22+T.sib+dynBonus;
+  st=r.sibRatio<sibOk?"ok":(r.sibRatio<sibBad?"warn":"bad");
+  cards+=card(U("capS"),fmt(r.sibRatio,1),st,st==="ok"?C("sibOk"):(st==="warn"?C("sibWarn"):C("sibBad")),
+    C("sibT")(r.sibCount?r.sibilants.slice(0,8).map(p=>ts(p.t)).join(" · ")
+      +(r.sibilants.length>8?C("more")(r.sibilants.length-8):""):"")+t(T.n));
+  S.push([U("capS"),st,st==="ok"?C("sibOk"):(st==="warn"?C("sibWarn"):C("sibBad"))]);
+  if(st!=="ok") todo.push(C("sibDo"));
+
+  const pLo=7+T.prox, pHi=15+T.prox;
+  st=(r.proxRatio>=pLo&&r.proxRatio<=pHi)?"ok":(r.proxRatio>pHi?"bad":"warn");
+  cards+=card(U("capD"),fmt(r.proxRatio,1),st,
+    r.proxRatio>pHi?C("dNear"):(r.proxRatio<pLo?C("dFar"):C("dOk")),
+    (r.proxRatio>pHi?C("dNearT"):r.proxRatio<pLo?C("dFarT"):C("dOkT"))+C("dWin")(fmt(pLo,0),fmt(pHi,0)));
+  S.push([U("capD"),st,r.proxRatio>pHi?C("dNear"):(r.proxRatio<pLo?C("dFar"):C("dOk"))]);
+  if(st!=="ok") todo.push(r.proxRatio>pHi?C("dDoNear"):C("dDoFar"));
+  /* niveau et distance sont des mesures indépendantes (l'une est une amplitude, l'autre un rapport
+     entre bandes), mais quand elles pointent dans le même sens, un seul geste corrige les deux. */
+  if(lvl==="low" && r.proxRatio<pLo) todo.unshift(C("bothFar"));
+  else if(lvl==="hot" && r.proxRatio>pHi) todo.unshift(C("bothNear"));
+  $("#cards").innerHTML=cards;
+
+  const gc=gainCalc(ci);
+  const ok=S.filter(x=>x[1]==="ok"), ko=S.filter(x=>x[1]!=="ok");
+  const row=(x,sym)=>`<li><i>${sym}</i><span><b>${x[0]}</b> — ${x[2]}</span></li>`;
+  $("#sumOk").innerHTML = ok.length?ok.map(x=>row(x,"✓")).join(""):`<p class="none">${U("nothingGood")}</p>`;
+  $("#sumKo").innerHTML = ko.length?ko.map(x=>row(x,"✗")).join(""):`<p class="none">${U("allGood")}</p>`;
+  $("#fixAll").innerHTML = todo.length?todo.map(x=>`<li>${x}</li>`).join(""):`<li>${U("noFixes")}</li>`;
+
+  const adv=[];
+  [[IFACES[ci.iface]||{},U("gCard")],[PRES[ci.pre]||{},U("gPre")],[INPROC[ci.inproc]||{},U("gProc")],
+   [MICS[ci.mic]||{},U("gMic")],[ROOMS[ci.room]||{},U("gRoom")]]
+   .forEach(([o,lab])=>{ if(o&&o.tips) t(o.tips).forEach(x=>adv.push([lab,x])); });
+  $("#gear").innerHTML = adv.length
+    ? adv.slice(0,8).map(a=>step("·",a[0],a[1])).join("")
+    : `<div class="stp"><div class="n">·</div><div><p>${U("gearNone")}</p></div></div>`;
+}
+
+/* ========= lecture et tête de lecture ========= */
+let AC=null, SRC=null, BUF=null, playing=false, startedAt=0, offset=0, rafId=0;
+const ac=()=>AC||(AC=new (window.AudioContext||window.webkitAudioContext)());
+const mmss=t=>{t=Math.max(0,t); return Math.floor(t/60)+":"+String(Math.floor(t%60)).padStart(2,"0");};
+const posNow=()=>playing?Math.min(BUF?BUF.duration:0, ac().currentTime-startedAt):offset;
+
+function markers(){
+  if(!LAST) return [];
+  return [...(LAST.sibilants||[]).map(m=>({t:m.t,c:"s"})),
+          ...(LAST.clips||[]).map(m=>({t:m.t,c:"c"}))].sort((a,b)=>a.t-b.t);
+}
+function stopSrc(){ if(SRC){ try{SRC.onended=null;SRC.stop();}catch(e){} SRC=null; } }
+function play(from){
+  if(!BUF) return;
+  stopSrc(); const c=ac();
+  SRC=c.createBufferSource(); SRC.buffer=BUF; SRC.connect(c.destination);
+  const T=selTimes();
+  const lim=Math.min(anaDur()||BUF.duration, BUF.duration);
+  const lo=T?T[0]:0, hi=T?Math.min(T[1],lim):lim;
+  offset=Math.max(lo,Math.min(from,hi-0.02));
+  startedAt=c.currentTime-offset;
+  if(T) SRC.start(0,offset,Math.max(0.05,hi-offset)); else SRC.start(0,offset);
+  SRC.onended=()=>{ if(playing) pause(hi); };
+  playing=true; $("#tPlay").textContent="⏸"; tick();
+}
+function pause(at){ offset=at!=null?at:posNow(); stopSrc(); playing=false;
+  $("#tPlay").textContent="▶"; cancelAnimationFrame(rafId); frame(); }
+function toggle(){ if(!BUF) return; playing?pause():play(offset>=BUF.duration-0.05?0:offset); }
+function seek(t){ if(!BUF) return; if(playing) play(t); else { offset=t; frame(); } }
+function jump(dir){
+  const M=markers(); if(!M.length||!BUF) return;
+  const cur=posNow()+ (dir>0?0.15:-0.15);
+  const cand = dir>0 ? M.find(m=>m.t>cur) : [...M].reverse().find(m=>m.t<cur);
+  if(cand) seek(Math.max(0,cand.t-0.35));
+}
+function tick(){ frame(); if(playing) rafId=requestAnimationFrame(tick); }
+function frame(){
+  const t=posNow();
+  $("#tTime").textContent=mmss(t)+" / "+mmss(Math.min(anaDur()||0,BUF?BUF.duration:0));
+  paint(t);
+}
+$("#tPlay").onclick=toggle;
+$("#tPrev").onclick=()=>jump(-1);
+$("#tNext").onclick=()=>jump(1);
+document.addEventListener("keydown",e=>{
+  if(e.code!=="Space"||!BUF) return;
+  const n=(e.target.tagName||"").toLowerCase();
+  if(n==="select"||n==="input"||n==="button") return;
+  e.preventDefault(); toggle();
+});
+
+/* ========= forme d'onde ========= */
+let LAST=null, RAW=null, SEL=null, CACHE=null;
+function paint(t){
+  const c=$("#wave"), x=c.getContext("2d");
+  if(!CACHE){ return; }
+  x.clearRect(0,0,c.width,c.height); x.drawImage(CACHE,0,0);
+  if(SEL && RAW){
+    const w=c.width, a=(SEL.i0/RAW.N)*w, b=(SEL.i1/RAW.N)*w;
+    x.fillStyle="rgba(10,9,6,.58)";
+    x.fillRect(0,0,a,c.height); x.fillRect(b,0,w-b,c.height);
+    x.strokeStyle="rgba(232,163,61,.9)"; x.lineWidth=2;
+    x.beginPath(); x.moveTo(a,0); x.lineTo(a,c.height); x.moveTo(b,0); x.lineTo(b,c.height); x.stroke();
+  }
+  if(BUF && t!=null){
+    const D=anaDur()||(BUF?BUF.duration:1); const px=(t/D)*c.width;
+    x.strokeStyle="rgba(255,255,255,.92)"; x.lineWidth=3;
+    x.beginPath(); x.moveTo(px,0); x.lineTo(px,c.height); x.stroke();
+    x.fillStyle="rgba(255,255,255,.92)"; x.beginPath();
+    x.moveTo(px-6,0); x.lineTo(px+6,0); x.lineTo(px,11); x.closePath(); x.fill();
+  }
+}
+
+function drawWave(r){
+  const c=$("#wave"),W=c.width,H=c.height;
+  if(!CACHE){ CACHE=document.createElement("canvas"); CACHE.width=W; CACHE.height=H; }
+  const x=CACHE.getContext("2d"), vis=c.getContext("2d");
+  if(!r){ x.clearRect(0,0,W,H); x.fillStyle="#0E0C09"; x.fillRect(0,0,W,H);
+    vis.clearRect(0,0,W,H); vis.drawImage(CACHE,0,0); return; }
+  const norm=d=>Math.max(0,Math.min(1,(d+70)/70)), bw=W/r.N, t0=performance.now(), D=720;
+  (function f(now){
+    const k=Math.min(1,(now-t0)/D), e=1-Math.pow(1-k,3), up=Math.floor(r.N*e);
+    x.clearRect(0,0,W,H); x.fillStyle="#0E0C09"; x.fillRect(0,0,W,H);
+    x.strokeStyle="rgba(232,163,61,.08)"; x.lineWidth=1;
+    for(let i=1;i<4;i++){const y=H*i/4;x.beginPath();x.moveTo(0,y);x.lineTo(W,y);x.stroke();}
+    const g=x.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,"#F0C070");g.addColorStop(.5,"#E8A33D");g.addColorStop(1,"#B87824");
+    x.fillStyle=g;
+    for(let i=0;i<up;i++){const h=norm(r.fDb[i])*H*.88;x.fillRect(i*bw,(H-h)/2,Math.max(bw*.9,1),h);}
+    if(k>=1){
+      const ny=(H-norm(r.noiseDb)*H*.88)/2;
+      x.strokeStyle="rgba(232,163,61,.28)";x.setLineDash([6,6]);x.lineWidth=2;
+      x.beginPath();x.moveTo(0,ny);x.lineTo(W,ny);x.stroke();x.setLineDash([]);
+      const m=(a,col)=>{x.strokeStyle=col;x.lineWidth=3;
+        a.forEach(p=>{const px=(p.t*r.sr/r.hop)*bw;x.beginPath();x.moveTo(px,0);x.lineTo(px,H);x.stroke();});};
+      m(r.sibilants,"rgba(79,168,196,.95)");
+      m(r.clips||[],"rgba(232,163,61,.95)");
+    }
+    vis.clearRect(0,0,W,H); vis.drawImage(CACHE,0,0);
+    if(k>=1) frame(); else requestAnimationFrame(f);
+  })(t0);
+}
+
+const anaDur=()=>RAW?RAW.N*RAW.hop/RAW.sr:0;
+function selTimes(){
+  if(!SEL||!RAW) return null;
+  return [SEL.i0*RAW.hop/RAW.sr, SEL.i1*RAW.hop/RAW.sr];
+}
+function applySel(){
+  if(!RAW) return;
+  LAST = SEL ? aggregate(RAW,SEL.i0,SEL.i1) : aggregate(RAW);
+  const T=selTimes();
+  $("#meta").textContent = T
+    ? `${U("selLab")} ${T[0].toFixed(1)}–${T[1].toFixed(1)} ${U("sec")} / ${RAW.dur.toFixed(1)} ${U("sec")}`
+    : `${RAW.dur.toFixed(1)} ${U("sec")} · ${RAW.channels===1?U("mono"):U("stereo")}`
+      + (RAW.truncated ? ` · ${U("trunc")} ${MAXSEC} ${U("trunc2")}` : "");
+  show(LAST, ctxInfo());
+  paint(posNow());
+}
+
+/* --- sélection à la souris sur la forme d'onde --- */
+(function(){
+  const cv=$("#wave"); let down=false, x0=0, moved=false;
+  const fracOf=e=>{ const r=cv.getBoundingClientRect();
+    return Math.max(0,Math.min(1,(e.clientX-r.left)/r.width)); };
+  cv.addEventListener("pointerdown",e=>{
+    if(!RAW) return;
+    down=true; moved=false; x0=fracOf(e); cv.setPointerCapture(e.pointerId);
+  });
+  cv.addEventListener("pointermove",e=>{
+    if(!down||!RAW) return;
+    const f=fracOf(e);
+    if(!moved && Math.abs(f-x0)*cv.getBoundingClientRect().width < 5) return;
+    moved=true;
+    const a=Math.min(x0,f), b=Math.max(x0,f);
+    SEL={i0:Math.round(a*RAW.N), i1:Math.round(b*RAW.N)};
+    paint(posNow());
+  });
+  cv.addEventListener("pointerup",e=>{
+    if(!down) return; down=false;
+    try{ cv.releasePointerCapture(e.pointerId); }catch(_){}
+    if(moved){ if(SEL.i1-SEL.i0<4) SEL=null; applySel(); }
+  });
+})();
+
+/* ========= entrées ========= */
+const HIST=[];
+function setFname(name){
+  $("#fname").innerHTML = name ? `<span class="dot"></span><b>${name}</b>` : U("noFileYet");
+}
+function pushHist(name,r,buf){
+  HIST.unshift({name,r,buf,t:new Date()});
+  if(HIST.length>8) HIST.pop();
+  refreshHist();
+}
+function refreshHist(){
+  const el=$("#hist");
+  if(!HIST.length){ el.disabled=true; el.innerHTML=`<option>${U("hist")} — ${U("histNone")}</option>`; return; }
+  el.disabled=false;
+  const hh=d=>String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");
+  el.innerHTML=`<option value="">${U("hist")} (${HIST.length})</option>`
+    + HIST.map((h,i)=>`<option value="${i}">${hh(h.t)} · ${h.name}</option>`).join("");
+  el.value="";
+}
+$("#hist").onchange=function(){
+  const i=this.value; if(i==="") return;
+  const h=HIST[+i];
+  RAW=h.r; SEL=null; LAST=aggregate(RAW); BUF=h.buf||null; setFname(h.name);
+  pause(0); offset=0;
+  ["#tPlay","#tPrev","#tNext"].forEach(id=>$(id).disabled=!BUF);
+  $("#drop").classList.toggle("playable",!!BUF);
+  $("#dropmsg").style.display="none";
+  show(LAST, ctxInfo());
+  this.value="";
+};
+
+async function handle(ab,name){
+  $("#dropmsg").innerHTML='<b><span class="eq"><i></i><i></i><i></i></span> '+U("analysing")+'</b>';
+  try{
+    const ctx=new (window.AudioContext||window.webkitAudioContext)();
+    const buf=await ctx.decodeAudioData(ab); await ctx.close();
+    BUF=buf; pause(0); offset=0;
+    const ci=ctxInfo(); RAW=await analyse(buf,ci); SEL=null; LAST=aggregate(RAW);
+    $("#dropmsg").style.display="none"; setFname(name||"—");
+    $("#cta").hidden=false;
+    pushHist(name||"—", RAW, buf); show(LAST,ci);
+    ["#tPlay","#tPrev","#tNext"].forEach(id=>$(id).disabled=false);
+    $("#drop").classList.add("playable");
+  }catch(e){
+    /* un decodage rate et un bug de code donnaient le meme message : on les separe. */
+    const decodeFail = /decod|EncodingError|Unable to decode/i.test(String(e&&(e.name+" "+e.message)));
+    $("#dropmsg").innerHTML = decodeFail
+      ? '<b>'+U("unreadable")+'</b>'
+      : '<b>'+U("failed")+'</b><br><span style="font-size:11px;opacity:.75">'+String(e&&e.message||e)+'</span>';
+    console.error(e);
+  }
+}
+const drop=$("#drop");
+drop.onclick=e=>{
+  if(!BUF){ $("#file").click(); return; }
+  if(e.target!==$("#wave")) return;
+  const rect=$("#wave").getBoundingClientRect();
+  const frac=Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width));
+  const t=frac*(anaDur()||BUF.duration);
+  const M=markers();
+  const T=selTimes();
+  if(T && (t<T[0]||t>T[1])){ SEL=null; applySel(); }     /* clic hors sélection : on l'efface */
+  const near=M.find(m=>Math.abs(m.t-t)<(anaDur()||BUF.duration)*0.012);   /* aimanté sur un repère */
+  seek(near?Math.max(0,near.t-0.35):t);
+  if(!playing) play(near?Math.max(0,near.t-0.35):t);
+};
+$("#impBtn").onclick=e=>{ e.stopPropagation(); $("#file").click(); };
+$("#file").onchange=e=>{const f=e.target.files[0];
+  if(f) f.arrayBuffer().then(ab=>handle(ab,f.name));
+  e.target.value="";};
+["dragenter","dragover"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("hot")}));
+["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("hot")}));
+drop.addEventListener("drop",e=>{const f=e.dataTransfer.files[0]; if(f) f.arrayBuffer().then(ab=>handle(ab,f.name));});
+
+/* ========= navigation ========= */
+$$(".pg[data-p]").forEach(b=>b.onclick=()=>{
+  $$(".pg[data-p]").forEach(x=>x.classList.toggle("on",x===b));
+  $$(".page").forEach((p,i)=>p.classList.toggle("on", i===+b.dataset.p));
+  if(+b.dataset.p===0 && LAST) drawWave(LAST);
+});
+$("#toBack").onclick=()=>$("#flip").classList.add("flipped");
+$("#toFront").onclick=()=>{ $("#flip").classList.remove("flipped"); buildBefore(); updateChain(); };
+$("#infoBtn").onclick=()=>$("#ovl").classList.add("open");
+$("#mclose").onclick=()=>$("#ovl").classList.remove("open");
+$("#ovl").onclick=e=>{ if(e.target===$("#ovl")) $("#ovl").classList.remove("open"); };
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") $("#ovl").classList.remove("open"); });
+
+let dark=false;
+function applyTheme(){
+  document.documentElement.setAttribute("data-theme",dark?"dark":"light");
+  $("#themeBtn").textContent = dark?U("themeDark"):U("themeLight");
+}
+$("#themeBtn").onclick=()=>{ dark=!dark; applyTheme(); };
+
+/* ========= réinitialisation ========= */
+function resetAll(){
+  LAST=null;
+  const def={"#iface":"","#pre":"","#inproc":"","#mic":"","#room":"none","#tess":"","#spl":"92"};
+  Object.entries(def).forEach(([id,v])=>{ $(id).value=v; });
+  $("#file").value="";
+  drawWave(null);
+  $("#dropmsg").style.display="";
+  $("#dropmsg").innerHTML=`<b>${U("dropHere")}</b><span>${U("dropSub")}</span>`;
+  ["#ledS","#ledC","#ledR"].forEach(id=>$(id).classList.remove("on"));
+  emptyCards(); $("#fixAll").innerHTML="";
+  $("#sumOk").innerHTML=""; $("#sumKo").innerHTML="";
+  $("#meta").textContent="1100 × 620";
+  HIST.length=0; refreshHist(); setFname(null);
+  pause(0); BUF=null; offset=0; CACHE=null; RAW=null; SEL=null;
+  ["#tPlay","#tPrev","#tNext"].forEach(id=>$(id).disabled=true);
+  $("#drop").classList.remove("playable"); $("#tTime").textContent="0:00 / 0:00";
+  $$(".pg[data-p]").forEach((x,i)=>x.classList.toggle("on",i===0));
+  $$(".page").forEach((pg,i)=>pg.classList.toggle("on",i===0));
+  buildBefore(); updateChain();
+}
+$("#resetBtn").onclick=resetAll;
+
+/* ========= i18n ========= */
+function renderHelp(){
+  const H=HELP[LANG], li=(a,b)=>`<li><b>${a}</b><span>${b}</span></li>`;
+  $("#mcontent").innerHTML=`<h3>${H.t}</h3><p class="msub">${H.sub}</p><p>${H.intro}</p>`
+   +`<h4>${H.h1}</h4><ul>${H.steps.map(x=>li(x[0],x[1])).join("")}</ul>`
+   +`<h4>${H.h2}</h4><ul>${H.pages.map(x=>li(x[0],x[1])).join("")}</ul>`
+   +`<h4>${H.h3}</h4><ul>${H.btns.map(x=>li(x[0],x[1])).join("")}</ul>`
+   +`<h4>${H.h4}</h4><ul>${H.leds.map(x=>`<li><span class="dot" style="color:${x[0]};background:${x[0]}"></span><span><b>${x[1]}</b> — ${x[2]}</span></li>`).join("")}</ul>`
+   +`<h4>${H.h5}</h4><ul>${H.reads.map(x=>li(x[0],x[1])).join("")}</ul>`
+   +`<p class="mnote">${H.note}</p>`;
+}
+function updateChain(){
+  const ci=ctxInfo();
+  const bits=[t((MICS[ci.mic]||{}).n),t((IFACES[ci.iface]||{}).n),t(SPL[ci.spl]),t((ROOMS[ci.room]||{}).n)]
+    .filter(x=>x && x.indexOf("—")<0);
+  $("#chain").textContent=bits.length?bits.join(" · ").toUpperCase():U("chain");
+}
+function setLang(l){
+  LANG=l; document.documentElement.lang=l;
+  ["#iface","#pre","#inproc","#mic","#room"].forEach(id=>{
+    const map={"#iface":IFACES,"#pre":PRES,"#inproc":INPROC,"#mic":MICS,"#room":ROOMS};
+    const cur=$(id).value;
+    $(id).innerHTML=Object.entries(map[id]).map(([k,v])=>`<option value="${k}">${t(v.n)}</option>`).join("");
+    $(id).value=cur;
+  });
+  fillSpl();
+  ["pg0","pg1","pg2","pg3"].forEach((id,i)=>$("#"+id).textContent=U("pg"+i));
+  $("#toBack").textContent=U("pgCfg"); $("#toFront").textContent=U("front");
+  $("#resetBtn").textContent=U("reset"); applyTheme();
+  refreshHist(); if(!LAST) setFname(null);
+  $("#ctaQ").textContent=U("ctaQ"); $("#ctaA").textContent=U("ctaA");
+  $("#backTitle").textContent=U("cfg");
+  $("#fMic").textContent=U("fMic"); $("#fIface").textContent=U("fIface");
+  $("#fPre").textContent=U("fPre"); $("#fProc").textContent=U("fProc");
+  $("#fRoom").textContent=U("fRoom"); $("#fTess").textContent=U("fTess"); $("#fSpl").textContent=U("fSpl");
+  $("#fixT2").textContent=U("fixesT");
+  $("#sumOkT").textContent=U("sumOk"); $("#sumKoT").textContent=U("sumKo");
+  $("#impBtn").title=U("importTip");
+  const leds=$$(".led span:last-child");
+  [U("ledS"),U("ledC"),U("ledR")].forEach((v,i)=>{ if(leds[i]) leds[i].textContent=v; });
+  if(!LAST) $("#dropmsg").innerHTML=`<b>${U("dropHere")}</b><span>${U("dropSub")}</span>`;
+  $("#caption").textContent=U("foot1");
+  $("#btnFR").classList.toggle("on",l==="fr"); $("#btnEN").classList.toggle("on",l==="en");
+  renderHelp(); buildBefore(); updateChain();
+  if(RAW) applySel(); else emptyCards();
+}
+$("#btnFR").onclick=()=>setLang("fr"); $("#btnEN").onclick=()=>setLang("en");
+
+/* ========= init ========= */
+fill("#iface",IFACES,""); fill("#pre",PRES,""); fill("#inproc",INPROC,"");
+fill("#mic",MICS,""); fill("#room",ROOMS,"none");
+fillTess(); fillSpl();
+["#iface","#pre","#inproc","#mic","#room","#tess","#spl"].forEach(id=>
+  $(id).addEventListener("change",()=>{ buildBefore(); updateChain(); if(RAW) applySel(); }));
+drawWave(null); setFname(null); refreshHist(); emptyCards();
+setLang("fr");
+</script>
